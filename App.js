@@ -7,7 +7,10 @@ import Profile from "./Pages/Profile";
 import Course from "./Pages/CourseDetials";  
 import Upcoming from "./Pages/Upcoming";
 import  Navi from "./Pages/Navigation";
+import PaymentBar from "./Components/PaymentBar";
 import Payment  from "./Pages/Payment"; 
+import PaymentHistory from "./Pages/PaymentHistory";
+import UpcomingPayment from "./Pages/UpcomingPayment";
 const Stack = createStackNavigator();
 
 export default function App() {
@@ -20,7 +23,9 @@ export default function App() {
         <Stack.Screen name="Navi" component={Navi} />
         <Stack.Screen name="Course" component={Course} />
         <Stack.Screen name="Upcoming" component={Upcoming} />
-        <Stack.Screen name="Payment" component={Payment} />
+        <Stack.Screen name="Payment" component={PaymentBar} />
+        <Stack.Screen name="PaymentHistory" component={PaymentHistory} />
+        <Stack.Screen name="UpcomingPayment" component={UpcomingPayment} />
       </Stack.Navigator>
     </NavigationContainer>
   );

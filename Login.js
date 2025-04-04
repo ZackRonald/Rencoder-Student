@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import FontAwesome from "react-native-vector-icons/FontAwesome";
 import { useFonts } from 'expo-font';
-import { storeToken } from "./utils/auth";  
+import { storeToken ,storeEmail} from "./utils/auth";  
 import axios from "axios";
 import React,{useEffect, useState} from 'react';
 import { useNavigation } from "@react-navigation/native";
@@ -23,30 +23,46 @@ export default function Login() {
   const [studEmail, setStudEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [otp, setOtp] = useState('');
+  const [isOtpGenerated, setIsOtpGenerated] = useState(false);
   const navigation = useNavigation();
-  const handleLogin = async () => {
+
+  const handleGenerateOtp = async () => {
     try {
-      console.log("Attempting login...");
-      const response = await axios.post("http://192.168.194.158:5000/login", { studEmail, password });
-      console.log("Server Response:", response.data);
-  
-      if (response.data.token) {
-        console.log("Entered Token Verification");
-  
-        await storeToken(response.data.token, studEmail);
-  
-        navigation.replace("Home");
-        setMessage("Logged in successfully!");
-      } else {
-        setMessage("Login failed, no token received");
-        Alert.alert("Login Failed", "Invalid email or password. Please try again.");
-      }
+        const response = await axios.post('http://192.168.4.60:5000/generateOtp', { studEmail });
+
+        if (response.status === 200) {
+            setIsOtpGenerated(true); 
+            await storeEmail(studEmail); 
+            setMessage("OTP sent to your email!");
+            Alert.alert("Success", "OTP has been sent to your email.");
+        }
     } catch (error) {
-      const errorMessage = error.response?.data?.message || "Login failed";
-      setMessage(errorMessage);
-      Alert.alert("Login Error", errorMessage);
+        const errorMessage = error.response?.data?.message || "Failed to generate OTP. Please try again.";
+        Alert.alert("Error", errorMessage);
+        console.error("Generate OTP Error:", errorMessage);
     }
-  };
+};
+
+const handleVerifyOtp = async () => {
+    try {
+        const response = await axios.post('http://192.168.4.60:5000/verifyOtp', { email: studEmail, otp });
+
+        if (response.status === 200) {
+            setMessage("OTP verified successfully!");
+            Alert.alert("Success", "OTP verified!");
+            await storeToken(response.data.token);  
+            setOtp('');
+            navigation.replace("Home");
+        }
+    } catch (error) {
+        const errorMessage = error.response?.data?.message || "Invalid OTP. Please try again.";
+        Alert.alert("Error", errorMessage);
+        console.error("Verify OTP Error:", errorMessage);
+    }
+};
+
+  
 
   const [fontsLoaded] = useFonts({
     'Poppins-Bold': require('./assets/Fonts/Poppins/Poppins-Bold.ttf'),
@@ -79,29 +95,46 @@ export default function Login() {
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
+  <StatusBar backgroundColor="#8968CD" barStyle="light-content" />
+  <Text style={styles.title}>Welcome to Rencoder Academy</Text>
 
-      
-      
-<StatusBar backgroundColor="#8968CD" barStyle="light-content" />
-<Text style={styles.title}>Welcome to Rencoder Academy</Text>
+  <Image source={require("./assets/Images/land.png")} style={styles.profileImage} />
 
-      <Image source={require("./assets/Images/land.png")} style={styles.profileImage} />
-      
-      <View style={styles.inputContainer}>
-        <FontAwesome name="user" style={styles.icon} />
-        <TextInput style={styles.input} placeholder="Enter your email id" onChangeText={setStudEmail} value={studEmail} />
-      </View>
+  {!isOtpGenerated ? (
+    <View style={styles.inputContainer}>
+      <FontAwesome name="user" style={styles.icon} />
+      <TextInput
+        style={styles.input}
+        placeholder="Enter your email id"
+        onChangeText={setStudEmail}
+        value={studEmail}
+      />
+    </View>
+  ) : (
+    <View style={styles.inputContainer}>
+      <FontAwesome name="lock" style={styles.icon} />
+      <TextInput
+        style={styles.input}
+        placeholder="Enter the OTP"
+        secureTextEntry
+        onChangeText={setOtp}
+        value={otp}
+      />
+    </View>
+  )}
 
-      <View style={styles.inputContainer}>
-        <FontAwesome name="lock" style={styles.icon} />
-        <TextInput style={styles.input} placeholder="Enter your password" secureTextEntry onChangeText={setPassword} value={password} />
-      </View>
+<Pressable 
+  style={styles.loginBtn} 
+  onPress={isOtpGenerated ? handleVerifyOtp : handleGenerateOtp}
+>
+  <Text style={styles.loginText}>
+    {isOtpGenerated ? "Verify OTP" : "Generate OTP"}
+  </Text>
+</Pressable>
 
-      <Pressable style={styles.loginBtn}>
-        <Text style={styles.loginText}  onPress={handleLogin}>Login</Text>
-      </Pressable>
-    </ScrollView>
-  );
+</ScrollView>
+
+   );
 }
 
 const styles = StyleSheet.create({

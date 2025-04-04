@@ -41,10 +41,10 @@ function Navigations() {
         <Text style={styles.label}>Profile</Text>
       </TouchableOpacity>
 
-      {/* <TouchableOpacity style={styles.card}  onPress={() => navigation.navigate('Payment')}>
+      <TouchableOpacity style={styles.card}  onPress={() => navigation.navigate('Payment')}>
         <Ionicons name="card" size={40} color="#8968CD" />
         <Text style={styles.label}>Payment</Text>
-      </TouchableOpacity> */}
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.card} onPress={handleLogout}>
         <Ionicons name="log-out-outline" size={40} color="#8968CD" />

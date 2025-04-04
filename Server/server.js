@@ -7,6 +7,9 @@ const bcrypt = require("bcryptjs");
 const multer = require('multer');
 const fs = require('fs');
 const app = express();
+const speakeasy = require('speakeasy');
+
+
 app.use(express.json());
 app.use(cors());
 
@@ -25,6 +28,10 @@ const JWT_SECRET = "RENCODER2025";
 const client = new MongoClient(uri);
 const db = client.db("Rencoder");
 const stud = db.collection("Student");
+
+// Generate a secret key (store this securely)
+
+
 app.use('/uploads', express.static('uploads'));
 
 app.post("/login", async (req, res) => {
@@ -66,6 +73,8 @@ app.post("/login", async (req, res) => {
         await client.close()
     }
 });
+
+
 app.post("/subjects", async (req, res) => {
     console.log("Enter the API");
 
@@ -207,7 +216,9 @@ app.post('/updateProfile', upload.single('profileImage'), async (req, res) => {
         const studEmail = req.body.studEmail;
         const studAddress = req.body.studAddress;  
         const degree = req.body.degree;
-        const studDOB = req.body.studDOB;          
+        const studDOB = req.body.studDOB; 
+        const studOccupation = req.body.studOccupation;
+        const studDesignation = req.body.studDesignation;         
         const imagePath = req.file ? `uploads/${req.file.filename}` : null;
 
         console.log('Received data:', req.body);
@@ -226,6 +237,8 @@ app.post('/updateProfile', upload.single('profileImage'), async (req, res) => {
         if (degree) updateFields.degree = degree;
         if (studDOB) updateFields.studDOB = studDOB;
         if (imagePath) updateFields.studPic = imagePath;
+        if( studOccupation) updateFields.studOccupation = studOccupation;
+        if( studDesignation) updateFields.studDesignation = studDesignation;
 
         const result = await stud.updateOne(
             { studEmail },
@@ -275,7 +288,7 @@ app.get('/getCourse', async (req, res) => {
         await client.connect();
         console.log("Enter the GetCourse");
 
-        const { studEmail } = req.query; // Changed from req.params to req.query
+        const { studEmail } = req.query;
 
         if (!studEmail) {
             return res.status(400).json({ message: "studEmail is required" });
@@ -305,7 +318,171 @@ app.get('/getCourse', async (req, res) => {
 });
 
 
+app.post('/payment',async(req,res)=>{
+try{
+    await client.connect();
+    console.log("Entered the payment API");
+    
+    const {studEmail,stack}=req.body;
 
- 
+    const paid= await stud.updateOne({
+        "course.stack":stack,
+        "studEmail":studEmail
+    }, { $set: { "courses.$.paymentStatus": "Paid" } });
+    console.log("Paid",paid);
+    if(!paid){
+        return res.status(404).json({message:"Course not found"});
+    }
+    res.status(200).json({message:"Payment Successful"});
+}
+catch(err){
+console.log(err);
+res.status(500).json({ error: "Internal Server Error" });
+}
+finally{
+    await client.close();
+}
+});
+
+app.post('/generateOtp', async (req, res) => {
+    try {
+        await client.connect();
+        const { studEmail } = req.body;
+
+        // Check if the user exists
+        const user = await stud.findOne({ studEmail });
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid email' });
+        }
+
+        // Generate a base32 secret using speakeasy
+        const secret = speakeasy.generateSecret({ length: 20 }).base32;
+        
+        // Generate a 6-digit OTP
+        const otp = speakeasy.totp({
+            secret: secret,
+            encoding: 'base32',
+            digits: 6,
+        });
+
+        console.log("Generated OTP:", otp);
+
+        // Save OTP and secret to the database with a timestamp
+        await stud.updateOne({ studEmail }, { $set: { otp, otpSecret: secret, otpExpires: Date.now() + 5 * 60 * 1000 } });
+
+        return res.status(200).json({ message: 'OTP generated successfully' });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+    finally{
+        await client.close();
+    }
+});
+
+app.post('/verifyOtp', async (req, res) => {
+    try {
+        await client.connect();
+        const { email, otp } = req.body;
+
+        // Find the user and check if OTP exists
+        const user = await stud.findOne({ studEmail: email });
+        if (!user || !user.otp || !user.otpSecret) {
+            return res.status(400).json({ message: 'Invalid email or OTP not generated' });
+        }
+
+        // Check if OTP has expired
+        if (Date.now() > user.otpExpires) {
+            return res.status(401).json({ message: 'OTP has expired' });
+        }
+
+        // Verify OTP using speakeasy
+        const isValidOtp = speakeasy.totp.verify({
+            secret: user.otpSecret,
+            encoding: 'base32',
+            token: otp,
+            window: 1,
+        });
+
+        if (!isValidOtp) {
+            return res.status(401).json({ message: 'Invalid OTP' });
+        }
+
+        // Generate JWT token
+        const token = jwt.sign({ userId: user._id, email: user.studEmail }, JWT_SECRET, { expiresIn: '7d' });
+
+        // OTP verified - clear OTP from the database
+        await stud.updateOne({ studEmail: email }, { $unset: { otp: "", otpSecret: "", otpExpires: "" } });
+
+        // Send the response only once
+        return res.status(200).json({ message: 'OTP verified successfully', token });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+    finally{
+        await client.close();
+    }
+});
+
+app.post("/payment", async (req, res) => {
+    try {
+        await client.connect();
+        console.log("Entered the payment API");
+
+        const { studEmail, stack,amountPaid,paymentType} = req.body;
+        console.log("Received data:", req.body);
+
+
+        let updateData;
+        if (paymentType === "Full") {
+            updateData = {
+                "courses.stack.$.payment.paymentType": "Full",
+                "courses.stack.$.payment.paymentStatus": "Paid",
+                "courses.stack.$.payment.dueAmount": courses.stack.payment.dueAmount - amountPaid,
+                "courses.stack.$.payment.paymentHistory": {
+                    $push: { amountPaid: paidAmount, date: new Date().toISOString() }
+                }
+            };
+        } else if (paymentType === "Partial") {
+            const dueAmount = dueAmount - paidAmount; 
+            updateData = {
+                "courses.$.payment.paymentType": "Partial",
+                "courses.$.payment.paymentStatus": dueAmount === 0 ? "Paid" : "Partially Paid",
+                "courses.$.payment.dueAmount": dueAmount,
+                "courses.$.payment.paymentHistory": {
+                    $push: { amountPaid: paidAmount, date: new Date().toISOString() }
+                }
+            };
+        }
+
+        const result = await stud.updateOne(
+            {
+                "studEmail": studEmail,
+                "courses.stack": stack
+            },
+            { $set: updateData }
+        );
+
+        if (result.modifiedCount > 0) {
+            console.log("Payment updated successfully");
+            res.status(200).json({ message: "Payment updated successfully" });
+        } else {
+            console.log("Payment update failed");
+            res.status(400).json({ message: "Payment update failed" });
+        }
+    } catch (error) {
+        console.log("Error in payment API", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    } finally {
+        await client.close();
+    }
+});
+
+
+
+
+
+  
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

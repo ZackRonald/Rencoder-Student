@@ -6,10 +6,13 @@ import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
+import { Picker } from '@react-native-picker/picker';
 
 function Profile() {
   const [address, setAddress] = useState('N/A');
   const [degree, setDegree] = useState('N/A');
+  const [occp, setOccp] = useState('N/A');
+  const [desgi, setDesgi] = useState('N/A');
   const [dob, setDob] = useState(null);  // dob is a string now
   const [profileImage, setProfileImage] = useState(require('../assets/Images/land.png'));
   const [buttonText, setButtonText] = useState('Edit');
@@ -21,7 +24,9 @@ function Profile() {
   const [isButtonVisible, setIsButtonVisible] = useState(true);
   const [isSaveDisabled, setIsSaveDisabled] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
-
+  const[isDeginVisible,setIsDeginVisible]=useState(false);
+  const [refresh, setRefresh] = useState(false); 
+const [isDesgiInpVisible,setisDesgiInpVisible]=useState(false)
   const navigation = useNavigation();
 
   const selectImage = async () => {
@@ -50,6 +55,8 @@ function Profile() {
       formData.append('studAddress', address);
       formData.append('degree', degree);
       formData.append('studDOB', dob);
+      formData.append('studDesignation', desgi);
+      formData.append('studOccupation', occp);
   
       if (profileImage && profileImage.uri) {
         // Extract the file extension from the URI
@@ -63,7 +70,7 @@ function Profile() {
         });
       }
   
-      const response = await axios.post('http://192.168.194.158:5000/updateProfile', formData, {
+      const response = await axios.post('http://192.168.4.60:5000/updateProfile', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'Accept': 'application/json',
@@ -75,7 +82,8 @@ function Profile() {
         setButtonText('Edit');
         setIsEditing(false);
         setIsButtonVisible(false); 
-        setIsModalVisible(false); 
+        setIsModalVisible(false);
+        setRefresh(!refresh); // Trigger re-render 
       } else {
         alert('Profile update failed');
         setButtonText('Update');
@@ -86,52 +94,71 @@ function Profile() {
       setButtonText('Update');
     }
   };
-  
+  const fetchProfile = async () => {
+    try {
+      const email = await SecureStore.getItemAsync('userEmail');
+      if (!email) {
+        console.error("No email found in secure storage");
+        setIsButtonVisible(true);
+        return;
+      }
+
+      const response = await axios.get('http://192.168.4.60:5000/getProfile', {
+        params: { studEmail: email },
+      });
+
+      if (response.status === 200) {
+        const { studName, studEmail, studPhone, studID, studAddress, degree, studDOB, studPic,studOccupation,studDesignation } = response.data.profile;
+        console.log(response.data.profile);
+        
+       setName(studName);
+        setEmail(studEmail);
+        setPhone(studPhone);
+        setStudentId(studID);
+        setAddress(studAddress);
+        setDegree(degree);
+        setDob(studDOB );
+        setOccp(studOccupation);
+        if(studDesignation !== "none" && studDesignation !== "N/A" && studDesignation !== "" && studDesignation !== "undefined") {
+          setIsDeginVisible(true);
+          setDesgi(studDesignation);
+          console.log("Designation set:", studDesignation); // Log to confirm
+      }
+      
+        
+        setOccp(studOccupation);
+
+        // Set profile image or default image
+        setProfileImage({ uri: studPic ? `http://192.168.4.60:5000/${studPic}` : `http://192.168.4.60:5000/uploads/profile.png` });
+
+        // Check if all required fields are filled
+        const isAllDataPresent = 
+          (studAddress && studAddress.trim() !== '') &&
+          (degree && degree.trim() !== '') &&
+          (studDOB && studDOB.trim() !== '') &&
+          (studPic && studPic.trim() !== '');
+
+        setIsButtonVisible(!isAllDataPresent);
+      }
+    } catch(error) {
+      console.error("Error fetching profile:", error);
+      setIsButtonVisible(true);
+    }
+  };
+  useEffect(()=>{
+    fetchProfile();
+  },[refresh])
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const email = await SecureStore.getItemAsync('userEmail');
-        if (!email) {
-          console.error("No email found in secure storage");
-          setIsButtonVisible(true);
-          return;
-        }
-  
-        const response = await axios.get('http://192.168.194.158:5000/getProfile', {
-          params: { studEmail: email },
-        });
-  
-        if (response.status === 200) {
-          const { studName, studEmail, studPhone, studID, studAddress, degree, studDOB, studPic } = response.data.profile;
-          setName(studName || '');
-          setEmail(studEmail || '');
-          setPhone(studPhone || '');
-          setStudentId(studID || '');
-          setAddress(studAddress || '');
-          setDegree(degree || '');
-          setDob(studDOB || '');
-  
-          // Set profile image or default image
-          setProfileImage({ uri: studPic ? `http://192.168.194.158:5000/${studPic}` : `http://192.168.194.158:5000/uploads/profile.png` });
-  
-          // Check if all required fields are filled
-          const isAllDataPresent = 
-            (studAddress && studAddress.trim() !== '') &&
-            (degree && degree.trim() !== '') &&
-            (studDOB && studDOB.trim() !== '') &&
-            (studPic && studPic.trim() !== '');
-  
-          setIsButtonVisible(!isAllDataPresent);
-        }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-        setIsButtonVisible(true);
-      }
-    };
-  
+    
     fetchProfile();
   }, []);
+
+  const handleOccupationChange = (itemValue) => {
+    setOccp(itemValue);
+    setisDesgiInpVisible(itemValue === "Employee");
+  };
+  
   
 
  
@@ -148,11 +175,11 @@ function Profile() {
 
         <Text style={styles.title}>Profile</Text>
 
-        {isButtonVisible && (
+       
   <TouchableOpacity onPress={() => setIsModalVisible(true)}>
     <Feather name="edit-3" size={28} color="#fff" />
   </TouchableOpacity>
-)}
+
 
       </View>
       <ImageBackground source={profileImage} style={styles.backgroundImg} resizeMode="cover">
@@ -166,12 +193,26 @@ function Profile() {
        <Text style={styles.label}>Student ID</Text>
        <Text style={styles.value}>{studentId}</Text>
        </View>
-        <View style={styles.miniCard}>
+        <View style={styles.miniCard2}>
         <Text style={styles.label}>Degree</Text>
         <Text style={styles.value}>{degree || "N/A"}</Text>
         
        </View>
         </View>
+        <View style={styles.cardConatiner}>
+        <View style={styles.miniCard}>
+        <Text style={styles.label}>Occupation</Text>
+              <Text style={styles.value}>{occp || "N/A"}</Text>
+        
+  
+       </View>
+       {isDeginVisible && (
+  <View style={styles.miniCard2}>
+    <Text style={styles.label}>Designation</Text>
+    <Text style={styles.value}>{desgi}</Text>
+  </View>
+)}
+        </View>    
         <View style={styles.cardConatiner}>
         <View style={styles.miniCard}>
         <Text style={styles.label}>Phone</Text>
@@ -197,6 +238,7 @@ function Profile() {
               <Text style={styles.value}>{address || "N/A"}</Text>
        </View>
         </View>    
+       
         </View>
        </View>
       </ScrollView>
@@ -207,7 +249,32 @@ function Profile() {
     </TouchableOpacity>
 
     <TextInput placeholder="Degree" style={styles.input} value={degree} onChangeText={setDegree} />
+
     <TextInput placeholder="Address" style={styles.textArea} value={address} onChangeText={setAddress} multiline />
+
+    {/* Occupation Picker */}
+    <View style={styles.pickerContainer}>
+    <Picker
+  selectedValue={occp}
+  onValueChange={(itemValue) => handleOccupationChange(itemValue)}
+  style={styles.input}
+>
+  <Picker.Item label="Select Occupation" value="" />
+  <Picker.Item label="Student" value="Student" />
+  <Picker.Item label="Fresher" value="Fresher" />
+  <Picker.Item label="Employee" value="Employee" />
+</Picker>
+
+
+    </View>
+    {isDesgiInpVisible && (
+  <TextInput
+    placeholder="Designation"
+    style={styles.input}
+    value={desgi}
+    onChangeText={setDesgi}
+  />
+)}
     <TextInput 
       style={styles.input} 
       value={dob} 
@@ -221,6 +288,7 @@ function Profile() {
     </View>
   </View>
 </Modal>
+
 
     </ScrollView>
   );
@@ -419,6 +487,22 @@ bottom:10
     flexDirection:"row",
     gap:70
   },
+  miniCard2:{
+    position:"relative",
+    right:30,
+  },
+  pickerContainer: {
+    width: '100%',
+    borderBottomWidth: 2,
+    borderBottomColor: '#FFD700',
+    marginVertical: 8,
+    backgroundColor: 'transparent',
+  },
+  picker: {
+    color: '#FFFFFF',
+    fontSize: 18,
+  },
+  
  
 });
 

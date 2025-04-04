@@ -19,7 +19,7 @@ function Upcoming() {
       }
 
       const response = await axios.post(
-        "http://192.168.194.158:5000/subjects",
+        "http://192.168.4.60:5000/subjects",
         { studEmail: email },
         { headers: { Authorization: `Bearer ${token}` } }
       );
