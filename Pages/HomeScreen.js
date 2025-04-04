@@ -25,7 +25,7 @@ export default function HomeScreen({ navigation }) {
       }
 
       const response = await axios.post(
-        "http://192.168.4.60:5000/subjects",
+        "http://192.168.194.158:5000/subjects",
         { studEmail: email },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -50,7 +50,7 @@ export default function HomeScreen({ navigation }) {
 
   const fetchAttendance = async () => {
     try {
-      const response = await axios.get("http://192.168.4.60:5000/getAttendance");
+      const response = await axios.get("http://192.168.194.158:5000/getAttendance");
       const attendanceData = response.data.attendance || [];
   
       const today = new Date().toISOString().split("T")[0];
@@ -84,7 +84,7 @@ export default function HomeScreen({ navigation }) {
   
   const markAttendance = async (stackName, subjectName) => {
     try {
-      await axios.post("http://192.168.4.60:5000/attendance", {
+      await axios.post("http://192.168.194.158:5000/attendance", {
         stackName,
         subjectName
       });

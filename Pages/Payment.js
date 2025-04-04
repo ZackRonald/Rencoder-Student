@@ -1,57 +1,91 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Modal, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, Modal, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { useFonts } from 'expo-font';
+
 
 function Payment() {
     const navigation = useNavigation();
     const [courses, setCourses] = useState([]);
     const [isModalVisible, setIsModalVisible] = useState(false);
-    const [stack, setStack] = useState('');
-    const [courseID, setCourseID] = useState('');
-    const [totalAmount, setTotalAmount] = useState(0);
+    const [selectedCourse, setSelectedCourse] = useState(null);
     const [paymentType, setPaymentType] = useState('Full');
     const [partialAmount, setPartialAmount] = useState('');
-    const [dueAmount, setDueAmount] = useState(0);
+    const [refresh, setRefresh] = useState(false);
+
+    
+  const [fontsLoaded] = useFonts({
+    'Poppins-Bold': require('../assets/Fonts/Poppins/Poppins-Bold.ttf'),
+    'Poppins-Medium': require('../assets/Fonts/Poppins/Poppins-Medium.ttf')
+  });
+
+    const fetchCourses = async () => {
+        try {
+            const studEmail = await SecureStore.getItemAsync('userEmail');
+            if (!studEmail) {
+                Alert.alert("Error", "No user email found. Please log in again.");
+                return;
+            }
+
+            const response = await axios.get('http://192.168.194.158:5000/getCourse', {
+                params: { studEmail },
+            });
+
+            if (response.data?.[0]?.courses) {
+                // Filter out courses that are fully paid
+                const unpaidCourses = response.data[0].courses.filter(course => course.payment.paymentStatus !== 'Paid');
+                setCourses(unpaidCourses);
+            } else {
+                Alert.alert("Error", "No courses found.");
+            }
+        } catch (error) {
+            Alert.alert("Error", "Failed to fetch courses.");
+        }
+    };
 
     useEffect(() => {
-        const fetchCourses = async () => {
-            try {
-                const studEmail = await SecureStore.getItemAsync('userEmail');
-                if (!studEmail) {
-                    Alert.alert("Error", "No user email found. Please log in again.");
-                    return;
-                }
-
-                const response = await axios.get('http://192.168.4.60:5000/getCourse', {
-                    params: { studEmail },
-                });
-
-                if (response.data && response.data[0] && response.data[0].courses) {
-                    setCourses(response.data[0].courses);
-                } else {
-                    Alert.alert("Error", "No courses found.");
-                }
-
-            } catch (error) {
-                Alert.alert("Error", "Failed to fetch courses. Please try again.");
-            }
-        };
-
         fetchCourses();
     }, []);
 
+    useEffect(() => {
+        fetchCourses();
+    }, [refresh]);
+
+    const openPaymentModal = (course) => {
+        setSelectedCourse(course);
+        setIsModalVisible(true);
+        setPaymentType("Full"); 
+        setPartialAmount('');
+    };
+
     const handlePayment = async () => {
+        if (!selectedCourse) return;
+
         try {
             const studEmail = await SecureStore.getItemAsync('userEmail');
-            const amountPaid = paymentType === 'Full' ? totalAmount : parseFloat(partialAmount);
+            const amountPaid = paymentType === 'Full' ? selectedCourse.payment.dueAmount : parseFloat(partialAmount);
 
-            const response = await axios.post('http://192.168.4.60:5000/payment', {
+            if (paymentType === 'Partial') {
+                const numericAmount = parseFloat(partialAmount);
+
+                if (!partialAmount || numericAmount < 2000) {
+                    Alert.alert("Error", "Minimum amount should be at least 2000.");
+                    return;
+                }
+
+                if (numericAmount > selectedCourse.payment.dueAmount) {
+                    Alert.alert("Error", "Entered amount cannot exceed the due amount.");
+                    return;
+                }
+            }
+
+            const response = await axios.post('http://192.168.194.158:5000/payment', {
                 studEmail,
-                stack,
+                stack: selectedCourse.stack,
                 amountPaid,
                 paymentType,
             });
@@ -59,6 +93,7 @@ function Payment() {
             if (response.status === 200) {
                 Alert.alert("Success", "Payment updated successfully");
                 setIsModalVisible(false);
+                setRefresh(!refresh);
             } else {
                 Alert.alert("Error", "Payment update failed");
             }
@@ -66,279 +101,291 @@ function Payment() {
             Alert.alert("Error", "Payment processing failed");
         }
     };
-    
+
     return (
-        <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.container}>
             <View style={styles.topBar}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.navigate('Navi')}
-                >
+                <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Navi')}>
                     <Ionicons name="arrow-back" size={28} color="#8968CD" />
                 </TouchableOpacity>
                 <Text style={styles.topBarText}>Payment</Text>
             </View>
 
-            <ScrollView contentContainerStyle={styles.scrollViewContent}>
-                {courses.map((course, index) => (
-                    <View key={index} style={styles.card}>
-                        <View style={styles.left}>
-                            <View>
-                                <Text style={styles.label}>Stack:</Text>
-                                <Text style={styles.value}>{course.stack || "N/A"}</Text>
-                            </View>
-                            <View>
-                                <Text style={styles.label}>Subjects:</Text>
-                                {course.subjects?.map((subject, idx) => (
-                                    <Text key={idx} style={styles.value}>{subject.subject}</Text>
-                                ))}
-                            </View>
-                            <View>
-                                <Text style={styles.label}>Amount:</Text>
-                                <Text style={styles.value}>{course.coursePrice || "N/A"}</Text>
-                            </View>
-                                     
-                        </View>
+            {courses.length > 0 ? (
+                <View Style={styles.scrollViewContent}>
+                    {courses.map((course, index) => (
+                        <View key={index} style={styles.card}>
+                            <View style={styles.left}>
+                                <Text style={styles.labelM}>Stack:</Text>
+                                <Text style={styles.valueM}>{course.stack || "N/A"}</Text>
 
-                        <View style={styles.right}>
-                            <View>
-                                <Text style={styles.label}>Course ID:</Text>
-                                <Text style={styles.value}>{course.courseID || "N/A"}</Text>
+                                <Text style={styles.labelM}>Course Price:</Text>
+                                <Text style={styles.valueM}>₹{course.payment.coursePrice || "N/A"}</Text>
+
+                                <Text style={styles.labelM}>Due Amount:</Text>
+                                <Text style={styles.valueM}>₹{course.payment.dueAmount || "N/A"}</Text>
                             </View>
-                            <View>
-                                <Text style={styles.label}>Start Date:</Text>
-                                <Text style={styles.value}>{course.startDate || "N/A"}</Text>
-                            </View>
-                         
-                            <View>
-                                <Text style={styles.label}>Payment Status:</Text>
-                                <Text style={styles.value}>{course.paymentStatus || "N/A"}</Text>
-                            </View>
-                            <View style={styles.btnContainer}>
+
+                            <View style={styles.right}>
+                                <Text style={styles.labelM}>Course ID:</Text>
+                                <Text style={styles.valueM}>{course.courseID || "N/A"}</Text>
+
+                                <Text style={styles.labelM}>Payment Status:</Text>
+                                <Text style={styles.valueM}>{course.payment.paymentStatus || "N/A"}</Text>
+
                                 <TouchableOpacity
-                                    onPress={() => handlePayment(course.courseID)}
-                                    disabled={course.paymentStatus === 'Paid'}
+                                    style={styles.payButton}
+                                    onPress={() => openPaymentModal(course)}
                                 >
-                                    <Text style={styles.btnText}>
-                                        {course.paymentStatus === 'Paid' ? 'Paid' : 'Pay'}
-                                    </Text>
+                                    <Text style={styles.payButtonText}>Pay</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
-                    </View>
-                ))}
-            </ScrollView>
+                    ))}
+                </View>
+            ) : (
+                <View style={styles.noPaymentContainer}>
+                    <Text style={styles.noPaymentText}>All fees are paid!</Text>
+                    <Image source={require('../assets/Images/paid.png')} style={styles.paidImage} />
+                </View>
+            )}
 
             <Modal visible={isModalVisible} transparent animationType="slide">
-    <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-            <View style={styles.row}>
-                <View style={styles.leftColumn}>
-                    <Text style={styles.label}>Stack:</Text>
-                    <Text style={styles.value}>MERN</Text>
-                </View>
-                <View style={styles.rightColumn}>
-                    <Text style={styles.label}>Course ID:</Text>
-                    <Text style={styles.value}>MERN2333</Text>
-                </View>
-            </View>
-            <View style={styles.amountContainer}>
-                <Text style={styles.label}>Total Amount:</Text>
-                <Text style={styles.value}>5000</Text>
-            </View>
-            <Picker
-                selectedValue={paymentType}
-                style={styles.picker}
-                onValueChange={(itemValue) => setPaymentType(itemValue)}
-            >
-                <Picker.Item label="Full Amount" value="Full" />
-                <Picker.Item label="Partial Amount" value="Partial" />
-            </Picker>
-            {paymentType === 'Full' ? (
-                <Text style={styles.infoText}>You are paying the full amount.</Text>
-            ) : (
-                <TextInput
-                    style={styles.input}
-                    placeholder="Enter Partial Amount"
-                    keyboardType="numeric"
-                    value={partialAmount}
-                    onChangeText={(text) => setPartialAmount(text)}
-                />
-            )}
-            <Text style={styles.dueText}>Due Amount: </Text>
-            <Text >5000</Text>
-            <TouchableOpacity style={styles.payButton} onPress={handlePayment}>
-                <Text style={styles.payButtonText}>Pay</Text>
-            </TouchableOpacity>
-        </View>
-    </View>
-</Modal>
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        {selectedCourse && (
+                            <>
+                                
+                                <View style={styles.cardMini}>
+                                <Text style={styles.label}>Stack:</Text>
+<Text style={styles.value}>{selectedCourse.stack}</Text>
+                                </View>
+                                <View style={styles.cardMini}>
+                                <Text style={styles.label}>Course ID:</Text>
+<Text style={styles.value}>{selectedCourse.courseID}</Text>
+                                </View>
+                                <View style={styles.cardMini}>
+                                <Text style={styles.label}>Course Price:</Text>
+<Text style={styles.value}>₹{selectedCourse.payment.coursePrice}</Text>
+                                </View>
+                              
+                                
+                                <View style={styles.cardMini}>
+                                <Text style={styles.label}>Due Amount:</Text>
+<Text style={styles.value}>₹{selectedCourse.payment.dueAmount}</Text>
+                                </View>
+                                <View style={{ width: '100%', borderWidth: 1, borderColor: '#ccc', borderRadius: 5 }}>
+    <Picker
+        selectedValue={paymentType}
+        onValueChange={(itemValue) => setPaymentType(itemValue)}
+    >
+        <Picker.Item label="Full Amount" value="Full" />
+        <Picker.Item label="Partial Amount" value="Partial" />
+    </Picker>
+</View>
 
-        </View>
+                                {paymentType === 'Partial' && (
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Enter Partial Amount"
+                                        keyboardType="numeric"
+                                        value={partialAmount}
+                                        onChangeText={(text) => {
+                                            const numericValue = text.replace(/[^0-9]/g, '');
+                                            setPartialAmount(numericValue);
+                                        }}
+                                    />
+                                )}
+
+                                <TouchableOpacity style={styles.payButton} onPress={handlePayment}>
+                                    <Text style={styles.payButtonText}>Pay</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity style={styles.cancelButton} onPress={() => setIsModalVisible(false)}>
+                                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+        </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#8968CD',
+    container: { flexGrow: 1, 
+        backgroundColor: '#8968CD' ,
+        paddingBottom: 20,
+         paddingTop: 40
+    
     },
-    topBar: {
-        backgroundColor: '#FFFFFF',
-        position: 'absolute',
-        top: 40,
-        left: 0,
-        width: '100%',
-        height: 60,
-        justifyContent: 'space-between',
+
+    topBar: { 
         flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        elevation: 5,
-        zIndex: 1,  
+         alignItems: 'center',
+         justifyContent:"space-between", 
+         backgroundColor: '#fff', 
+         padding: 16 ,
+        top:0
     },
-    topBarText: {
-        color: '#8968CD',
-        fontSize: 28,
+    topBarText: { fontSize: 24, 
         fontWeight: 'bold',
-        padding: 10,
+         color: '#8968CD',
+         fontFamily: 'Poppins-Bold'  
+         },
+
+    backButton: { 
+        marginRight: 10 
     },
-    backButton: {
-        left: 10,
-    },
-    scrollViewContent: {
-        paddingTop: 30, // Space for the top bar
-        paddingBottom: 80, // Some extra space at the bottom
-    },
-    card: {
-        marginTop: 20,
+
+    scrollViewContent: { 
+        paddingBottom: 40,
+        paddingTop:40,
+        
+     },
+
+     card: {
         flexDirection: 'row',
-        backgroundColor: 'rgba(137, 104, 205, 0.85)',
+        backgroundColor: '#fff',
+        padding: 16,
+        margin: 10,
+        borderRadius: 10,
+        justifyContent: 'space-between', // Distributes content evenly
+        alignItems: 'center',
+        backgroundColor: "rgba(255, 255, 255, 0.12)",
         padding: 20,
         borderRadius: 20,
-        shadowColor: '#8968CD',
+        shadowColor: "#00FFFF",
         shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.5,
+        shadowOpacity: 0.4,
         shadowRadius: 15,
         borderWidth: 1.5,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        gap: 60,
-        top: 60,
-        width:"95%",
-        left:10
-        
+        borderColor: "rgba(255, 255, 255, 0.3)",
+        // Keeps items aligned properly
     },
     left: {
-        gap: 10,
+        flex: 1, // Ensures both left and right sections take equal space
+        justifyContent: 'center',
     },
     right: {
-        gap: 10,
-    },
-    label: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    value: {
-        color: '#E0D7F7',
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 8,
-    },
-    btnContainer: {
-        marginTop: 16,
-        backgroundColor: '#FFFFFF',
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    btnText: {
-        color: '#8968CD',
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    modalContainer: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    modalContent: {
-        backgroundColor: 'white',
-        padding: 20,
-        borderRadius: 10,
-        width: '90%',
-        alignItems: 'center',
-    },
-    row: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-    },
-    leftColumn: {
-        marginRight: 20,
-    },
-    rightColumn: {
-        marginLeft: 20,
-    },
-    label: {
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    value: {
-        fontSize: 16,
-        marginBottom: 10,
-    },
-    picker: {
-        width: '80%',
-        marginVertical: 10,
-    },
-    label: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    value: {
-        color: '#E0D7F7',
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 8,
+        alignItems: 'flex-end', // Aligns content to the right
     },
     
-    input: {
-        height: 40,
-        borderColor: '#ccc',
-        borderWidth: 1,
-        marginVertical: 10,
-        paddingHorizontal: 10,
-        width: '80%',
-        borderRadius: 5,
+    label: { 
+        fontSize: 16, 
+        fontFamily: 'Poppins-Bold'  
+     },
+
+    value: { 
+        fontSize: 16, 
+        marginBottom: 10,
+        // fontFamily: 'Poppins-Medium'  
     },
-    infoText: {
-        fontSize: 16,
-        marginVertical: 5,
-        color: 'green',
+    labelM: { 
+        fontSize: 16, 
+        fontFamily: 'Poppins-Bold',
+        color: "#E6E6FA",  
+     },
+
+    valueM: { 
+        fontSize: 16, 
+        marginBottom: 10,
+        color: "#FFFFFF",
     },
-    dueText: {
-        fontSize: 16,
-        marginVertical: 5,
-        color: 'red',
-    },
-    payButton: {
-        backgroundColor: '#8968CD',
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 5,
+
+    payButton: { 
+        backgroundColor: '#00FFFF', // Matching the card's glow
+        paddingVertical: 12,
+        width: '100%',
+        borderRadius: 8,
+        alignItems: 'center',
         marginTop: 15,
+        shadowColor: '#00FFFF',
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.5,
+        shadowRadius: 10,
+        borderWidth: 1,
+        borderColor: "rgba(0, 255, 255, 0.6)",
     },
-    payButtonText: {
+    
+    payButtonText: { 
+        color: '#001F3F', // Deep blue for contrast
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+    
+
+    modalContainer: { 
+        flex: 1,
+        justifyContent: 'center', 
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)', // Slightly darker overlay
+    },
+    
+    modalContent: { 
+        backgroundColor: 'white', 
+        padding: 25, 
+        borderRadius: 15, 
+        width: '90%', 
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 10, // For Android shadow
+    },
+    
+    cardMini: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        width: "100%",
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: "#E0E0E0",
+    },
+    
+ 
+    
+    cancelButton: { 
+        marginTop: 10,
+        width: '100%',
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        backgroundColor: '#F44336',
+    },
+    
+    cancelButtonText: { 
         color: 'white',
-        fontSize: 18,
+        fontWeight: 'bold',
+        fontSize: 16,
     },
+    
+    paidImage: { 
+        width: 300,
+         height: 300, 
+         marginTop: 10 
+        },
+        noPaymentContainer: { 
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'transparent',
+        },
+        
+        noPaymentText: { 
+            fontSize: 30, 
+            color: 'white', 
+            fontFamily: 'Poppins-Bold',
+          
+            textShadowOffset: { width: 1, height: 1 },
+            textShadowRadius: 5,
+            marginBottom: 10,
+        },
+        
+
 });
 
 export default Payment;

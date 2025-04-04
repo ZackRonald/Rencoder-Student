@@ -29,7 +29,7 @@ export default function Login() {
 
   const handleGenerateOtp = async () => {
     try {
-        const response = await axios.post('http://192.168.4.60:5000/generateOtp', { studEmail });
+        const response = await axios.post('http://192.168.194.158:5000/generateOtp', { studEmail });
 
         if (response.status === 200) {
             setIsOtpGenerated(true); 
@@ -46,7 +46,7 @@ export default function Login() {
 
 const handleVerifyOtp = async () => {
     try {
-        const response = await axios.post('http://192.168.4.60:5000/verifyOtp', { email: studEmail, otp });
+        const response = await axios.post('http://192.168.194.158:5000/verifyOtp', { email: studEmail, otp });
 
         if (response.status === 200) {
             setMessage("OTP verified successfully!");

@@ -70,7 +70,7 @@ const [isDesgiInpVisible,setisDesgiInpVisible]=useState(false)
         });
       }
   
-      const response = await axios.post('http://192.168.4.60:5000/updateProfile', formData, {
+      const response = await axios.post('http://192.168.194.158:5000/updateProfile', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'Accept': 'application/json',
@@ -103,7 +103,7 @@ const [isDesgiInpVisible,setisDesgiInpVisible]=useState(false)
         return;
       }
 
-      const response = await axios.get('http://192.168.4.60:5000/getProfile', {
+      const response = await axios.get('http://192.168.194.158:5000/getProfile', {
         params: { studEmail: email },
       });
 
@@ -129,7 +129,7 @@ const [isDesgiInpVisible,setisDesgiInpVisible]=useState(false)
         setOccp(studOccupation);
 
         // Set profile image or default image
-        setProfileImage({ uri: studPic ? `http://192.168.4.60:5000/${studPic}` : `http://192.168.4.60:5000/uploads/profile.png` });
+        setProfileImage({ uri: studPic ? `http://192.168.194.158:5000/${studPic}` : `http://192.168.194.158:5000/uploads/profile.png` });
 
         // Check if all required fields are filled
         const isAllDataPresent = 

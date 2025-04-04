@@ -318,31 +318,7 @@ app.get('/getCourse', async (req, res) => {
 });
 
 
-app.post('/payment',async(req,res)=>{
-try{
-    await client.connect();
-    console.log("Entered the payment API");
-    
-    const {studEmail,stack}=req.body;
 
-    const paid= await stud.updateOne({
-        "course.stack":stack,
-        "studEmail":studEmail
-    }, { $set: { "courses.$.paymentStatus": "Paid" } });
-    console.log("Paid",paid);
-    if(!paid){
-        return res.status(404).json({message:"Course not found"});
-    }
-    res.status(200).json({message:"Payment Successful"});
-}
-catch(err){
-console.log(err);
-res.status(500).json({ error: "Internal Server Error" });
-}
-finally{
-    await client.close();
-}
-});
 
 app.post('/generateOtp', async (req, res) => {
     try {
@@ -430,38 +406,43 @@ app.post("/payment", async (req, res) => {
         await client.connect();
         console.log("Entered the payment API");
 
-        const { studEmail, stack,amountPaid,paymentType} = req.body;
+        const { studEmail, stack, amountPaid, paymentType } = req.body;
         console.log("Received data:", req.body);
 
+        // Fetch the student document to get the current dueAmount
+        const student = await stud.findOne({ studEmail });
 
-        let updateData;
-        if (paymentType === "Full") {
-            updateData = {
-                "courses.stack.$.payment.paymentType": "Full",
-                "courses.stack.$.payment.paymentStatus": "Paid",
-                "courses.stack.$.payment.dueAmount": courses.stack.payment.dueAmount - amountPaid,
-                "courses.stack.$.payment.paymentHistory": {
-                    $push: { amountPaid: paidAmount, date: new Date().toISOString() }
-                }
-            };
-        } else if (paymentType === "Partial") {
-            const dueAmount = dueAmount - paidAmount; 
-            updateData = {
-                "courses.$.payment.paymentType": "Partial",
-                "courses.$.payment.paymentStatus": dueAmount === 0 ? "Paid" : "Partially Paid",
-                "courses.$.payment.dueAmount": dueAmount,
-                "courses.$.payment.paymentHistory": {
-                    $push: { amountPaid: paidAmount, date: new Date().toISOString() }
-                }
-            };
+        if (!student) {
+            return res.status(404).json({ message: "Student not found" });
         }
 
+        // Find the course with the given stack
+        const course = student.courses.find(course => course.stack === stack);
+        if (!course) {
+            return res.status(404).json({ message: "Course not found" });
+        }
+
+        let dueAmount = course.payment.dueAmount || course.payment.coursePrice; // Default to full price if dueAmount not set
+        dueAmount -= amountPaid; // Calculate new due amount
+
+        let updateData = {
+            "courses.$.payment.paymentType": paymentType,
+            "courses.$.payment.paymentStatus": dueAmount === 0 ? "Paid" : "Partially Paid",
+            "courses.$.payment.dueAmount": dueAmount
+        };
+
+        // Update the payment details
         const result = await stud.updateOne(
             {
                 "studEmail": studEmail,
                 "courses.stack": stack
             },
-            { $set: updateData }
+            {
+                $set: updateData,
+                $push: {
+                    "courses.$.payment.paymentHistory": { amountPaid, date: new Date().toISOString().split("T")[0] }
+                }
+            }
         );
 
         if (result.modifiedCount > 0) {
@@ -478,6 +459,55 @@ app.post("/payment", async (req, res) => {
         await client.close();
     }
 });
+
+app.get("/history", async (req, res) => {
+    try {
+        await client.connect();
+        console.log("Enter the history");
+
+        const { studEmail } = req.query;
+
+        if (!studEmail) {
+            return res.status(400).json({ message: "studEmail is required" });
+        }
+
+        const result = await stud.findOne(
+            { studEmail: studEmail },
+            { projection: { courses: 1, _id: 0 } }
+        );
+
+        if (!result || !result.courses || result.courses.length === 0) {
+            return res.status(404).json({ message: "No courses found for this email" });
+        }
+
+        // Extract required fields from each course
+        const formattedCourses = result.courses.map((course) => ({
+            stack: course.stack,
+            courseID: course.courseID,
+            startDate: course.startDate,
+            coursePrice: course.payment?.coursePrice || 0,
+            paymentType: course.payment?.paymentType || "N/A",
+            dueAmount: course.payment?.dueAmount || 0,
+            paymentStatus: course.payment?.paymentStatus || "Unknown",
+            paymentHistory: Array.isArray(course.payment?.paymentHistory) 
+                ? course.payment.paymentHistory 
+                : Object.values(course.payment?.paymentHistory || {}),
+        }));
+
+        console.log(formattedCourses);
+
+        console.log("Exit history API");
+        res.json(formattedCourses);
+    } catch (error) {
+        console.error("Error fetching course history:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    } finally {
+        await client.close();
+    }
+});
+
+  
+
 
 
 
