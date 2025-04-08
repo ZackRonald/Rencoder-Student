@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   topbar: {
     backgroundColor: '#9400D3',
     position: "absolute",
-    top: 41,
+    top: 0,
     left: 0,
     width: "100%",
     height: 60,

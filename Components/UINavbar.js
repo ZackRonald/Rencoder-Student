@@ -18,7 +18,7 @@ const Navbar = ({ navigation }) => {
         justifyContent: "space-between",
         alignItems: "center",
         position:"relative",
-      top:30,
+     
       width:"100%"
       }}
     >

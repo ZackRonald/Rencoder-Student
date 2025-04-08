@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#674B89',
     position: "relative",
-    top: 30,
+    
     marginBottom: 40,
   },
   backButton: {
@@ -356,9 +356,10 @@ const styles = StyleSheet.create({
   },
   backgroundImg: {
    height:350,
-bottom:10
+bottom:40
   },
   profileImage: {
+   
     width: 140,
     height: 140,
     borderRadius: 70,
@@ -371,9 +372,7 @@ bottom:10
     shadowRadius: 6,
     elevation: 10,
   },
-  detailsContainer: {
-    marginTop: 10,
-  },
+
   label: {
     fontSize: 18,
     color: '#FFD700',

@@ -8,6 +8,9 @@ const multer = require('multer');
 const fs = require('fs');
 const app = express();
 const speakeasy = require('speakeasy');
+const { cloneElement } = require("react");
+app.use(express.json({ limit: '10mb' })); // or higher
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 
 app.use(express.json());
@@ -99,78 +102,196 @@ console.error("Error inserting attendance:", error.response?.data || error.messa
 
 app.post("/attendance", async (req, res) => {
     try {
-        await client.connect();
-        console.log("Enter the API");
-
-        const { subjectName, stackName } = req.body;
-        console.log("Received Subject:", subjectName, "Stack:", stackName);
-
-        if (!subjectName || !stackName) {
-            return res.status(400).json({ error: "Subject name and stack name are required" });
-        }
-
-        // Insert attendance record in attendance array
-        const newAttendance = {
-            date: new Date().toISOString().split("T")[0],
-            stack: stackName,
-            subject: subjectName, 
-            status: "Present"
-        };
-
-        const updatedStudent = await stud.updateOne(
-            {}, 
-            { $push: { attendance: newAttendance } } 
-        );
-
-        // Increase the attendance count inside the relevant course
-        const updateCourseAttendance = await stud.updateOne(
-            { "courses.stack": stackName, "courses.subjects.subject": subjectName }, 
-            { $inc: { "courses.$[].subjects.$[subject].attendance": 1 } },
-            { arrayFilters: [{ "subject.subject": subjectName }] } 
-        );
-
-        console.log("Attendance inserted:", updatedStudent);
-        console.log("Course attendance updated:", updateCourseAttendance);
-
-        res.status(200).json({ message: "Attendance added successfully" });
-
-    } catch (err) {
-        console.error("Error inserting attendance:", err);
-        res.status(500).json({ error: "Internal Server Error" });
-    } finally {
-        await client.close();
+      await client.connect();
+      console.log("Enter the attendance API");
+  
+      const token = req.headers.authorization?.split(" ")[1];
+  
+      if (!token) {
+        return res.status(401).json({ error: "Unauthorized: No token provided" });
+      }
+  
+      let decoded;
+      try {
+        decoded = jwt.verify(token, JWT_SECRET);
+      } catch (err) {
+        return res.status(403).json({ error: "Invalid token" });
+      }
+  
+      const studentEmail = decoded.email;
+      const { image, subjectName, stackName } = req.body;
+  
+      if (!subjectName || !stackName || !image) {
+        return res.status(400).json({ error: "Subject, stack, and image are required" });
+      }
+  
+      // Make sure folder exists
+      const folderPath = path.join(__dirname, "attendance_images");
+      if (!fs.existsSync(folderPath)) {
+        fs.mkdirSync(folderPath);
+      }
+  
+      const imageBuffer = Buffer.from(image, 'base64');
+      const filename = `${subjectName}_${stackName}_${Date.now()}.jpg`;
+      const filepath = path.join(folderPath, filename);
+      fs.writeFileSync(filepath, imageBuffer);
+  
+      const newAttendance = {
+        date: new Date().toISOString().split("T")[0],
+        stack: stackName,
+        subject: subjectName,
+        status: "Present",
+        imagePath: filepath,
+      };
+  
+console.log(newAttendance);
+const updatedStudent = await stud.updateOne(
+    {
+      studEmail: studentEmail,
+      "courses.stack": stackName,
+      "courses.subjects.subject": subjectName
+    },
+    {
+      $push: {
+        "courses.$[course].subjects.$[subject].attendance": newAttendance
+      }
+    },
+    {
+      arrayFilters: [
+        { "course.stack": stackName },
+        { "subject.subject": subjectName }
+      ]
     }
-});
-
-app.get("/getAttendance", async (req, res) => {
-    try {
-        await client.connect();
-        console.log("Fetching attendance records...");
-
-        const today = new Date().toISOString().split("T")[0];
-
-        const student = await stud.findOne({}, { projection: { attendance: 1, _id: 0 } });
-        
-        if (!student || !student.attendance) {
-            return res.status(404).json({ attendance: [] });
+  );
+  
+  
+      console.log(updatedStudent);
       
+      const updateCourseAttendance = await stud.updateOne(
+        { email: studentEmail, "courses.stack": stackName },
+        {
+          $inc: { "courses.$[course].subjects.$[subject].attendanceCount": 1 }
+        },
+        {
+          arrayFilters: [
+            { "course.stack": stackName },
+            { "subject.subject": subjectName }
+          ]
         }
-
-        const todayAttendance = student.attendance.filter(record => record.date === today);
-
-        console.log("Attendance data sent:", todayAttendance);
-        res.status(200).json({ attendance: todayAttendance });
-
-
+      );
+  
+      console.log("Attendance inserted:", updatedStudent.modifiedCount);
+      res.status(200).json({ message: "Attendance marked successfully" });
+  
     } catch (err) {
-        console.error("Error fetching attendance:", err);
-        res.status(500).json({ error: "Internal Server Error" });
-        await client.close();
-    } 
-    finally{
-        await client.close();
+      console.error("Error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    } finally {
+      await client.close();
     }
-});
+  });
+
+
+ 
+  app.post("/getAttendance", async (req, res) => {
+    try {
+      const { studEmail } = req.body;
+  
+      console.log("Fetching attendance records...");
+  
+      try{
+        
+        
+        await client.connect();
+        
+        console.log("Entered The try block");
+      }
+
+      catch(error){
+        console.log("enter the catch block");
+        console.log("Error",error);
+      }
+
+      const student = await stud.findOne({ studEmail });
+      if (!student) return res.status(404).json({ error: "Student not found" });
+  
+      const today = new Date().toISOString().split("T")[0];
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split("T")[0];
+  
+      const absentRecords = [];
+  
+      for (const course of student.courses || []) {
+        for (const subject of course.subjects || []) {
+          const subjectAttendance = Array.isArray(subject.attendance) ? subject.attendance : [];
+  
+          const markedYesterday = subjectAttendance.some(att => att.date === yesterdayStr);
+  
+          if (!markedYesterday && subject.status === "In Progress") {
+            absentRecords.push({
+              courseIndex: student.courses.indexOf(course),
+              subjectIndex: course.subjects.indexOf(subject),
+              absentRecord: {
+                date: yesterdayStr,
+                stack: course.stack,
+                subject: subject.subject,
+                status: "Absent",
+                imagePath: null
+              }
+            });
+          }
+        }
+      }
+  
+      for (const rec of absentRecords) {
+        const { courseIndex, subjectIndex, absentRecord } = rec;
+        const attendancePath = `courses.${courseIndex}.subjects.${subjectIndex}.attendance`;
+  
+        // Sanitize: Ensure target path is an array
+        const doc = await stud.findOne({ studEmail });
+        const currentVal = (((doc.courses || [])[courseIndex] || {}).subjects || [])[subjectIndex]?.attendance;
+  
+        if (!Array.isArray(currentVal)) {
+          await stud.updateOne(
+            { studEmail },
+            { $set: { [attendancePath]: [] } }
+          );
+        }
+  
+        await stud.updateOne(
+          { studEmail },
+          { $push: { [attendancePath]: absentRecord } }
+        );
+      }
+  
+      const updatedStudent = await stud.findOne({ studEmail });
+      const todayAttendance = [];
+  
+      for (const course of updatedStudent.courses || []) {
+        for (const subject of course.subjects || []) {
+          const subjectAttendance = Array.isArray(subject.attendance) ? subject.attendance : [];
+          for (const att of subjectAttendance) {
+            if (att.date === today) {
+              todayAttendance.push(att);
+            }
+          }
+        }
+      }
+  
+      console.log("Today's Attendance:", todayAttendance);
+      res.status(200).json({ attendance: todayAttendance });
+  
+    } catch (err) {
+      console.error("Error fetching attendance:", err);
+      res.status(500).json({ error: "Internal Server Error" });
+    } finally {
+      await client.close();
+    }
+  });
+  
+  
+  
 
 app.post("/courseDetails", async (req, res) => {
     try {
@@ -261,13 +382,13 @@ app.post('/updateProfile', upload.single('profileImage'), async (req, res) => {
 
 app.get('/getProfile', async (req, res) => {
     try {
-        await client.connect();
+    
         const { studEmail } = req.query;
 
         if (!studEmail) {
             return res.status(400).json({ error: "Email is required" });
         }
-
+        await client.connect();
         const result = await stud.findOne({ studEmail });
 
         if (!result) {

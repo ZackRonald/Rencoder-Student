@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
          justifyContent:"space-between", 
          backgroundColor: '#fff', 
          padding: 16 ,
-        top:0
+       bottom:40
     },
     topBarText: { fontSize: 24, 
         fontWeight: 'bold',

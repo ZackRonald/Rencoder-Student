@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', 
     height: 70,
     marginBottom: 60,
-    top: 40
+    top: 0
   },
   
   topBarText: { fontSize: 24, 
