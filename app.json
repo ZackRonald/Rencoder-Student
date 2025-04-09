@@ -8,24 +8,29 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-  "image": "./assets/splash-icon.png",
-  "resizeMode": "cover",
-  "backgroundColor": "#8968CD"
-},
-"android": {
-  "splash": {
-    "image": "./assets/splash-icon.png",
-    "resizeMode": "contain",
-    "backgroundColor": "#8968CD"
-  }
-},
-"ios": {
-  "splash": {
-    "image": "./assets/splash-icon.png",
-    "resizeMode": "contain",
-    "backgroundColor": "#8968CD"
-  }
-},
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#8968CD"
+    },
+    "android": {
+      "splash": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#8968CD"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.oswaldprasanna.rencoder"
+    },
+    "ios": {
+      "splash": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#8968CD"
+      }
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
@@ -38,8 +43,21 @@
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
           "recordAudioAndroid": true
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./local/assets/notification_icon.png",
+          "color": "#ffffff",
+          "defaultChannel": "default",
+          "enableBackgroundRemoteNotifications": true
+        }
       ]
-    ]
-    
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "939852e6-4622-40c0-8d69-956371b44485"
+      }
+    }
   }
 }

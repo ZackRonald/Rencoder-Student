@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { View, Text, ScrollView, StyleSheet, Dimensions } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import axios from "axios";
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 
 const { width, height } = Dimensions.get("window");
 
@@ -43,9 +45,17 @@ export default function CourseDetails({ navigation }) {
     }
   };
 
-  useEffect(() => {
-    fetchCoursesDetails();
-  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Re-fetch courses or attendance when screen becomes active
+      fetchCoursesDetails();
+  
+      return () => {
+        // optional: cleanup when navigating away
+      };
+    }, [])
+  );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>

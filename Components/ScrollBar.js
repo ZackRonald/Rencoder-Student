@@ -4,11 +4,12 @@ import FontAwesome from "react-native-vector-icons/FontAwesome";
 import HomeScreen from "../Pages/HomeScreen";
 import Upcoming from "../Pages/Upcoming";
 import Course from "../Pages/CourseDetials";
-
+import { useIsFocused } from '@react-navigation/native';
 
 const Tab = createBottomTabNavigator();
 
 const ScrollBar = () => {
+
   return (
     <Tab.Navigator
       initialRouteName="Home"

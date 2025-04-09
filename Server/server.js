@@ -32,7 +32,7 @@ const client = new MongoClient(uri);
 const db = client.db("Rencoder");
 const stud = db.collection("Student");
 
-// Generate a secret key (store this securely)
+
 
 
 app.use('/uploads', express.static('uploads'));
@@ -167,8 +167,8 @@ const updatedStudent = await stud.updateOne(
   
       console.log(updatedStudent);
       
-      const updateCourseAttendance = await stud.updateOne(
-        { email: studentEmail, "courses.stack": stackName },
+      const result = await stud.updateOne(
+        { studEmail: studentEmail, "courses.stack": stackName },
         {
           $inc: { "courses.$[course].subjects.$[subject].attendanceCount": 1 }
         },
@@ -179,6 +179,9 @@ const updatedStudent = await stud.updateOne(
           ]
         }
       );
+      
+      console.log("Matched:", result.matchedCount);
+      console.log("Modified:", result.modifiedCount);
   
       console.log("Attendance inserted:", updatedStudent.modifiedCount);
       res.status(200).json({ message: "Attendance marked successfully" });
@@ -296,6 +299,7 @@ const updatedStudent = await stud.updateOne(
 app.post("/courseDetails", async (req, res) => {
     try {
         console.log("Enter the Course Details API");
+        console.log("Entered for notifications");
         
         await client.connect();
         
@@ -626,14 +630,5 @@ app.get("/history", async (req, res) => {
         await client.close();
     }
 });
-
-  
-
-
-
-
-
-
-  
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

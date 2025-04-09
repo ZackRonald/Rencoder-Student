@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   container: { 
     flexGrow: 1,
     
-    backgroundColor: "#8968CD", // Keeping as is
+    backgroundColor: "#8968CD",
   },
   topBar: { 
     flexDirection: 'row',
