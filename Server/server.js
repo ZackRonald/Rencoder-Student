@@ -31,10 +31,6 @@ const JWT_SECRET = "RENCODER2025";
 const client = new MongoClient(uri);
 const db = client.db("Rencoder");
 const stud = db.collection("Student");
-
-
-
-
 app.use('/uploads', express.static('uploads'));
 
 app.post("/login", async (req, res) => {
@@ -76,7 +72,6 @@ app.post("/login", async (req, res) => {
         await client.close()
     }
 });
-
 
 app.post("/subjects", async (req, res) => {
     console.log("Enter the API");
@@ -193,10 +188,8 @@ const updatedStudent = await stud.updateOne(
       await client.close();
     }
   });
-
-
  
-  app.post("/getAttendance", async (req, res) => {
+app.post("/getAttendance", async (req, res) => {
     try {
       const { studEmail } = req.body;
   
@@ -293,10 +286,9 @@ const updatedStudent = await stud.updateOne(
     }
   });
   
-  
-  
-
-app.post("/courseDetails", async (req, res) => {
+app.get("/courseDetails", async (req, res) => {
+    console.log("Enterede the Course Details API");
+    
     try {
         console.log("Enter the Course Details API");
         console.log("Entered for notifications");
@@ -304,7 +296,8 @@ app.post("/courseDetails", async (req, res) => {
         await client.connect();
         
 
-        const { studEmail } = req.body; 
+        const { studEmail } = req.query;
+
         console.log(studEmail);
         
         if (!studEmail) {
@@ -330,7 +323,6 @@ app.post("/courseDetails", async (req, res) => {
         await client.close();
     }
 });
-
 
 app.post('/updateProfile', upload.single('profileImage'), async (req, res) => {
     try {
@@ -420,19 +412,20 @@ app.get('/getCourse', async (req, res) => {
         }
 
 
-        const courses = await stud.find(
+        const userData = await stud.findOne(
             { studEmail: studEmail },
-            { projection: {courses:1,_id: 0 } }
-        ).toArray();
-
-        if (courses.length === 0) {
-            return res.status(404).json({ message: "No courses found for this email" });
-        }
-
-        console.log(courses);
-        
-        console.log("Exit");
-        res.json(courses);
+            { projection: { courses: 1, targetLat: 1, targetLog: 1, _id: 0 } }
+          );
+          
+          if (!userData) {
+            return res.status(404).json({ error: "Student not found" });
+          }
+          
+          const courses = userData.courses || [];
+          const targetLat = userData.targetLat;
+          const targetLog = userData.targetLog;
+          
+          return res.json({ courses, targetLat, targetLog });
 
     } catch (error) {
         console.log("Error fetching courses:", error);
@@ -441,9 +434,6 @@ app.get('/getCourse', async (req, res) => {
         await client.close();
     }
 });
-
-
-
 
 app.post('/generateOtp', async (req, res) => {
     try {
@@ -631,4 +621,39 @@ app.get("/history", async (req, res) => {
     }
 });
 
+// GET /filterSubjects
+app.get('/filterSubjects', async (req, res) => {
+  const { studEmail, status } = req.query;
+
+  try {
+    await client.connect();
+    const student = await stud.findOne({ studEmail: studEmail });
+    if (!student) return res.status(404).send("Student not found");
+
+    let subjects = [];
+
+    student.courses.forEach(course => {
+      course.subjects.forEach(sub => {
+        if (!status || sub.status === status) {
+          subjects.push({
+            ...sub,
+            stack: course.stack,
+            courseID: course.courseID,
+            startDate: course.startDate,
+          });
+        }
+      });
+    });
+
+    res.status(200).json(subjects);
+  } catch (error) {
+    res.status(500).send("Server error");
+  }
+  finally{
+    await client.close();
+  }
+});
+
+
+  
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

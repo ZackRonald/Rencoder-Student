@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Modal, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } from 'react-native';
+import { View, Text, TextInput, Modal, StyleSheet, TouchableOpacity, Alert, ScrollView, Image, Dimensions } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
@@ -7,6 +7,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { useFonts } from 'expo-font';
 
+const { width, height } = Dimensions.get('window');
 
 function Payment() {
     const navigation = useNavigation();
@@ -17,11 +18,10 @@ function Payment() {
     const [partialAmount, setPartialAmount] = useState('');
     const [refresh, setRefresh] = useState(false);
 
-    
-  const [fontsLoaded] = useFonts({
-    'Poppins-Bold': require('../assets/Fonts/Poppins/Poppins-Bold.ttf'),
-    'Poppins-Medium': require('../assets/Fonts/Poppins/Poppins-Medium.ttf')
-  });
+    const [fontsLoaded] = useFonts({
+        'Poppins-Bold': require('../assets/Fonts/Poppins/Poppins-Bold.ttf'),
+        'Poppins-Medium': require('../assets/Fonts/Poppins/Poppins-Medium.ttf')
+    });
 
     const fetchCourses = async () => {
         try {
@@ -31,18 +31,24 @@ function Payment() {
                 return;
             }
 
-            const response = await axios.get('http://192.168.194.158:5000/getCourse', {
+            const response = await axios.get('http://192.168.194.158:5000/courseDetails', {
                 params: { studEmail },
             });
 
-            if (response.data?.[0]?.courses) {
-                // Filter out courses that are fully paid
-                const unpaidCourses = response.data[0].courses.filter(course => course.payment.paymentStatus !== 'Paid');
-                setCourses(unpaidCourses);
-            } else {
-                Alert.alert("Error", "No courses found.");
+            const courses = response.data;
+
+            if (!Array.isArray(courses)) {
+                Alert.alert("Error", "Invalid course data received.");
+                return;
             }
+
+            const unpaidCourses = courses.filter(course =>
+                course.payment?.paymentStatus !== 'Paid'
+            );
+
+            setCourses(unpaidCourses);
         } catch (error) {
+            console.error("Fetch error:", error);
             Alert.alert("Error", "Failed to fetch courses.");
         }
     };
@@ -58,7 +64,7 @@ function Payment() {
     const openPaymentModal = (course) => {
         setSelectedCourse(course);
         setIsModalVisible(true);
-        setPaymentType("Full"); 
+        setPaymentType("Full");
         setPartialAmount('');
     };
 
@@ -112,7 +118,7 @@ function Payment() {
             </View>
 
             {courses.length > 0 ? (
-                <View Style={styles.scrollViewContent}>
+                <View style={styles.scrollViewContent}>
                     {courses.map((course, index) => (
                         <View key={index} style={styles.card}>
                             <View style={styles.left}>
@@ -155,34 +161,32 @@ function Payment() {
                     <View style={styles.modalContent}>
                         {selectedCourse && (
                             <>
-                                
                                 <View style={styles.cardMini}>
-                                <Text style={styles.label}>Stack:</Text>
-<Text style={styles.value}>{selectedCourse.stack}</Text>
+                                    <Text style={styles.label}>Stack:</Text>
+                                    <Text style={styles.value}>{selectedCourse.stack}</Text>
                                 </View>
                                 <View style={styles.cardMini}>
-                                <Text style={styles.label}>Course ID:</Text>
-<Text style={styles.value}>{selectedCourse.courseID}</Text>
+                                    <Text style={styles.label}>Course ID:</Text>
+                                    <Text style={styles.value}>{selectedCourse.courseID}</Text>
                                 </View>
                                 <View style={styles.cardMini}>
-                                <Text style={styles.label}>Course Price:</Text>
-<Text style={styles.value}>₹{selectedCourse.payment.coursePrice}</Text>
+                                    <Text style={styles.label}>Course Price:</Text>
+                                    <Text style={styles.value}>₹{selectedCourse.payment.coursePrice}</Text>
                                 </View>
-                              
-                                
                                 <View style={styles.cardMini}>
-                                <Text style={styles.label}>Due Amount:</Text>
-<Text style={styles.value}>₹{selectedCourse.payment.dueAmount}</Text>
+                                    <Text style={styles.label}>Due Amount:</Text>
+                                    <Text style={styles.value}>₹{selectedCourse.payment.dueAmount}</Text>
                                 </View>
+
                                 <View style={{ width: '100%', borderWidth: 1, borderColor: '#ccc', borderRadius: 5 }}>
-    <Picker
-        selectedValue={paymentType}
-        onValueChange={(itemValue) => setPaymentType(itemValue)}
-    >
-        <Picker.Item label="Full Amount" value="Full" />
-        <Picker.Item label="Partial Amount" value="Partial" />
-    </Picker>
-</View>
+                                    <Picker
+                                        selectedValue={paymentType}
+                                        onValueChange={(itemValue) => setPaymentType(itemValue)}
+                                    >
+                                        <Picker.Item label="Full Amount" value="Full" />
+                                        <Picker.Item label="Partial Amount" value="Partial" />
+                                    </Picker>
+                                </View>
 
                                 {paymentType === 'Partial' && (
                                     <TextInput
@@ -214,178 +218,153 @@ function Payment() {
 }
 
 const styles = StyleSheet.create({
-    container: { flexGrow: 1, 
-        backgroundColor: '#8968CD' ,
-        paddingBottom: 20,
-         paddingTop: 40
-    
+    container: {
+        flexGrow: 1,
+        backgroundColor: '#8968CD',
+       
     },
-
-    topBar: { 
+    topBar: {
         flexDirection: 'row',
-         alignItems: 'center',
-         justifyContent:"space-between", 
-         backgroundColor: '#fff', 
-         padding: 16 ,
-       bottom:40
-    },
-    topBarText: { fontSize: 24, 
-        fontWeight: 'bold',
-         color: '#8968CD',
-         fontFamily: 'Poppins-Bold'  
-         },
-
-    backButton: { 
-        marginRight: 10 
-    },
-
-    scrollViewContent: { 
-        paddingBottom: 40,
-        paddingTop:40,
-        
-     },
-
-     card: {
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        padding: 16,
-        margin: 10,
-        borderRadius: 10,
-        justifyContent: 'space-between', // Distributes content evenly
         alignItems: 'center',
-        backgroundColor: "rgba(255, 255, 255, 0.12)",
-        padding: 20,
+        justifyContent: 'space-between',
+        backgroundColor: '#fff',
+        padding: width * 0.04,
+        marginBottom: height * 0.02,
+    },
+    topBarText: {
+        fontSize: width * 0.06,
+        fontWeight: 'bold',
+        color: '#8968CD',
+        fontFamily: 'Poppins-Bold',
+    },
+    backButton: {
+        marginRight: 10,
+    },
+    
+    card: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+        padding: width * 0.05,
+        marginHorizontal: width * 0.03,
+        marginBottom: height * 0.02,
         borderRadius: 20,
-        shadowColor: "#00FFFF",
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        shadowColor: '#00FFFF',
         shadowOffset: { width: 0, height: 5 },
         shadowOpacity: 0.4,
         shadowRadius: 15,
         borderWidth: 1.5,
-        borderColor: "rgba(255, 255, 255, 0.3)",
-        // Keeps items aligned properly
+        borderColor: 'rgba(255, 255, 255, 0.3)',
     },
-    left: {
-        flex: 1, // Ensures both left and right sections take equal space
-        justifyContent: 'center',
-    },
+    left: { flex: 1 },
     right: {
         flex: 1,
-        alignItems: 'flex-end', // Aligns content to the right
+        alignItems: 'flex-end',
     },
-    
-    label: { 
-        fontSize: 16, 
-        fontFamily: 'Poppins-Bold'  
-     },
-
-    value: { 
-        fontSize: 16, 
-        marginBottom: 10,
-        // fontFamily: 'Poppins-Medium'  
-    },
-    labelM: { 
-        fontSize: 16, 
+    label: {
+        fontSize: width * 0.04,
         fontFamily: 'Poppins-Bold',
-        color: "#E6E6FA",  
-     },
-
-    valueM: { 
-        fontSize: 16, 
-        marginBottom: 10,
-        color: "#FFFFFF",
     },
-
-    payButton: { 
-        backgroundColor: '#00FFFF', // Matching the card's glow
-        paddingVertical: 12,
+    value: {
+        fontSize: width * 0.04,
+        marginBottom: 10,
+    },
+    labelM: {
+        fontSize: width * 0.04,
+        fontFamily: 'Poppins-Bold',
+        color: '#E6E6FA',
+    },
+    valueM: {
+        fontSize: width * 0.04,
+        marginBottom: 10,
+        color: '#FFFFFF',
+    },
+    payButton: {
+        backgroundColor: '#00FFFF',
+        paddingVertical: height * 0.015,
         width: '100%',
         borderRadius: 8,
         alignItems: 'center',
-        marginTop: 15,
+        marginTop: height * 0.02,
         shadowColor: '#00FFFF',
         shadowOffset: { width: 0, height: 5 },
         shadowOpacity: 0.5,
         shadowRadius: 10,
         borderWidth: 1,
-        borderColor: "rgba(0, 255, 255, 0.6)",
+        borderColor: 'rgba(0, 255, 255, 0.6)',
     },
-    
-    payButtonText: { 
-        color: '#001F3F', // Deep blue for contrast
+    payButtonText: {
+        color: '#001F3F',
         fontWeight: 'bold',
-        fontSize: 16,
+        fontSize: width * 0.045,
     },
-    
-
-    modalContainer: { 
+    modalContainer: {
         flex: 1,
-        justifyContent: 'center', 
+        justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.6)', // Slightly darker overlay
+        backgroundColor: 'rgba(0,0,0,0.6)',
     },
-    
-    modalContent: { 
-        backgroundColor: 'white', 
-        padding: 25, 
-        borderRadius: 15, 
-        width: '90%', 
+    modalContent: {
+        backgroundColor: 'white',
+        padding: width * 0.06,
+        borderRadius: 15,
+        width: '90%',
         alignItems: 'center',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 5,
-        elevation: 10, // For Android shadow
+        elevation: 10,
     },
-    
     cardMini: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        width: "100%",
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: "#E0E0E0",
-    },
-    
- 
-    
-    cancelButton: { 
-        marginTop: 10,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         width: '100%',
-        paddingVertical: 10,
+        paddingVertical: height * 0.01,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
+    },
+    cancelButton: {
+        marginTop: height * 0.02,
+        width: '100%',
+        paddingVertical: height * 0.015,
         borderRadius: 8,
         alignItems: 'center',
         backgroundColor: '#F44336',
     },
-    
-    cancelButtonText: { 
+    cancelButtonText: {
         color: 'white',
         fontWeight: 'bold',
-        fontSize: 16,
+        fontSize: width * 0.045,
     },
-    
-    paidImage: { 
-        width: 300,
-         height: 300, 
-         marginTop: 10 
-        },
-        noPaymentContainer: { 
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'transparent',
-        },
-        
-        noPaymentText: { 
-            fontSize: 30, 
-            color: 'white', 
-            fontFamily: 'Poppins-Bold',
-          
-            textShadowOffset: { width: 1, height: 1 },
-            textShadowRadius: 5,
-            marginBottom: 10,
-        },
-        
-
+    paidImage: {
+        width: width * 0.7,
+        height: width * 0.7,
+        marginTop: height * 0.02,
+    },
+    noPaymentContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'transparent',
+    },
+    noPaymentText: {
+        fontSize: width * 0.07,
+        color: 'white',
+        fontFamily: 'Poppins-Bold',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 5,
+        marginBottom: 10,
+    },
+    input: {
+        width: '100%',
+        marginTop: height * 0.015,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 5,
+        padding: width * 0.03,
+    },
 });
 
 export default Payment;

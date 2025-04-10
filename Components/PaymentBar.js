@@ -51,20 +51,8 @@ const PaymentBar = () => {
           ),
         }}
       />
-     <Tab.Screen
-        name="Upcoming Payment"
-        component={UpcomingPayment}
-        options={{
-          title: "Upcoming",
-          tabBarIcon: ({ focused }) => (
-            <FontAwesome
-              name="calendar-check-o"
-              size={24}
-              color={focused ? "#8968CD" : "black"}
-            />
-          ),
-        }}
-      />
+     
+      
     </Tab.Navigator>
   );
 };

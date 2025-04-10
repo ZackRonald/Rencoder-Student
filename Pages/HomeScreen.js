@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { StatusBar, ScrollView, View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Modal } from "react-native";
 import Navbar from "../Components/UINavbar";
+import Loader from "../Components/AnimatedLoader";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as SecureStore from "expo-secure-store";
 import axios from "axios";
@@ -9,9 +10,13 @@ import { Dimensions } from "react-native";
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
+import * as Location from 'expo-location';
+import { Linking } from 'react-native';
+
 const { width, height } = Dimensions.get("window");
 
 export default function HomeScreen({ navigation }) {
+  const [location, setLocation] = useState();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [facing, setFacing] = useState("back");
@@ -22,6 +27,9 @@ export default function HomeScreen({ navigation }) {
   const [currentStackName, setCurrentStackName] = useState("");
   const cameraRef = useRef(null);
   const [todayAttendance, setTodayAttendance] = useState([]);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+const [activate, setActivate] = useState(false);
+
   const setupNotifications = async (courses) => {
     try {
       const now = new Date();
@@ -87,6 +95,23 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const openCameraModal = async (subject, stack) => {
+    const { status } = await Location.getForegroundPermissionsAsync();
+
+    if (status !== "granted") {
+      setShowLocationModal(true);
+      return;
+    }
+    console.log("Pressmission granted");
+    
+    console.log("ACtivation",activate);
+    setActivate(!activate);
+    console.log("Sctivstivon",activate);
+    
+    checkLocationAndOpenCamera(subject, stack);
+  };
+
+  
   useEffect(() => {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -108,13 +133,21 @@ export default function HomeScreen({ navigation }) {
         }
       };
   
+     
       const initialize = async () => {
-        await requestNotifPermissions();
-        const fetchedCourses = await fetchCourses();
-        await fetchTodayAttendance();
-        await setupNotifications(fetchedCourses); // ✅ pass courses here
+        setLoading(true); // Start loading before all requests
+      
+        try {
+          await requestNotifPermissions();
+          const fetchedCourses = await fetchCourses(); // setCourses handled here
+          await fetchTodayAttendance();
+          await setupNotifications(fetchedCourses);
+        } catch (error) {
+          console.error("Initialization failed:", error);
+        } finally {
+          setLoading(false); // End loading after all are complete
+        }
       };
-  
       initialize();
   
       // Optional cleanup if needed
@@ -123,14 +156,27 @@ export default function HomeScreen({ navigation }) {
       };
     }, [])
   );
+  // useEffect(() => {
+  //   const requestLocationPermission = async () => {
+  //     console.log("Entered location permission request");
+      
+  //     const { status } = await Location.requestForegroundPermissionsAsync();
+  //     if (status === "granted") {
+  //       const loc = await Location.getCurrentPositionAsync({});
+  //       setLocation(loc);
+  //       console.log("Location:", loc);
+        
+  //     } else {
+  //       alert("Location permission denied");
+  //       return;
+  //     }
+  //   }
+  //   requestLocationPermission();
+  // },[activate])
   
   const toggleCameraFacing = () => setFacing(f => f === "back" ? "front" : "back");
 
-  const openCameraModal = (subject, stack) => {
-    setCurrentSubjectName(subject);
-    setCurrentStackName(stack);
-    setCameraModalVisible(true);
-  };
+
 
   const closeCameraModal = () => setCameraModalVisible(false);
 
@@ -138,25 +184,45 @@ export default function HomeScreen({ navigation }) {
     try {
       const token = await SecureStore.getItemAsync("authToken");
       const email = await SecureStore.getItemAsync("userEmail");
-
+  
       if (!token || !email) {
         console.error("Token or Email not found");
         setLoading(false);
-        return;
+        return [];
       }
-
-      const response = await axios.post("http://192.168.194.158:5000/subjects", { studEmail: email }, {
+  
+      const response = await axios.get("http://192.168.194.158:5000/getCourse", {
+        params: { studEmail: email },
         headers: { Authorization: `Bearer ${token}` },
       });
+      
+  
+      console.log("Full Response", response.data);
+  
       const fetchedCourses = response.data.courses || [];
+  
+      const longi = response.data.targetLog;
+      const lati = response.data.targetLat;
+      
+      if (lati && longi) {
+        await SecureStore.setItemAsync("targetLat", lati.toString());
+        await SecureStore.setItemAsync("targetLog", longi.toString());
+        console.log("✅ Stored lat/log:", lati, longi);
+      } else {
+        console.error("❌ Missing lat/log from API:", lati, longi);
+      }
+  
       setCourses(fetchedCourses);
-      return fetchedCourses;
+  
+      return fetchedCourses; // So it still works with setupNotifications()
     } catch (error) {
       console.error("Error fetching courses:", error.response?.data || error.message);
+      return [];
     } finally {
       setLoading(false);
     }
   };
+  
 
   const takePicture = async () => {
     if (!cameraRef.current) return;
@@ -185,6 +251,90 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const checkLocationAndOpenCamera = async (subject, stack) => {
+    console.log("📍 Checking location...");
+  
+    let latitude, longitude;
+  
+    try {
+      setLoading(true);
+      const loc = await Location.getCurrentPositionAsync({});
+      latitude = loc.coords.latitude;
+      longitude = loc.coords.longitude;
+    } catch (error) {
+      console.log(error);
+      alert("Failed to get your location.");
+      return;
+    } finally {
+      setLoading(false);
+    }
+  
+    // Get target location from SecureStore
+    const latStr = await SecureStore.getItemAsync("targetLat");
+    const logStr = await SecureStore.getItemAsync("targetLog");
+  
+    console.log("Retrieved raw lat/lng:", latStr, logStr);
+  
+    const targetLat = parseFloat(latStr);
+    const targetLog = parseFloat(logStr);
+  
+    if (!targetLat || !targetLog) {
+      alert("Target location not set.");
+      return;
+    }
+  
+    const distance = getDistanceFromLatLonInMeters(latitude, longitude, targetLat, targetLog);
+  
+    console.log(`📏 Distance from target: ${distance.toFixed(2)} meters`);
+  
+    if (distance <= 100) {
+      console.log("✅ Within 100m range. Opening camera...");
+      setCurrentSubjectName(subject);
+      setCurrentStackName(stack);
+      setCameraModalVisible(true);
+    } else {
+      console.log("❌ Not within range.");
+      alert("You are not near the location to mark attendance.");
+    }
+  };
+  
+  
+  const getDistanceFromLatLonInMeters = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // Radius of the earth in meters
+    const toRad = (value) => (value * Math.PI) / 180;
+  
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+  
+    const a =Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+  
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+  
+    return distance; // in meters
+  };
+  if (loading) {
+    return (
+      <Modal
+  transparent={true}
+  visible={loading}
+  animationType="fade"
+>
+
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <Loader />
+ 
+  </View>
+</Modal>
+
+    
+    
+    );
+  }
 
   return (
     <View style={styles.scrollContainer}>
@@ -252,11 +402,12 @@ export default function HomeScreen({ navigation }) {
                           </Text>
                         ) : (
                           <TouchableOpacity
-                            onPress={() => openCameraModal(subject.subject, course.stack)}
-                            style={styles.iconButton}
-                          >
-                            <Icon name="camera-reverse-outline" size={30} color="#fff" />
-                          </TouchableOpacity>
+                          onPress={() => openCameraModal(subject.subject, course.stack)}
+                          style={styles.iconButton}
+                        >
+                          <Icon name="camera-reverse-outline" size={30} color="#fff" />
+                        </TouchableOpacity>
+                        
                         )}
                       </View>
                     );
@@ -269,7 +420,6 @@ export default function HomeScreen({ navigation }) {
         
       </View>
       </ScrollView>
-      {/* ✅ Camera Modal */}
       <Modal visible={isCameraModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalContainer}>
           <View style={styles.cameraWrapper}>
@@ -289,6 +439,38 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+
+      <Modal visible={showLocationModal} transparent animationType="fade">
+  <View style={styles.modalContainer}>
+    <View style={styles.permissionModal}>
+      <Text style={styles.modalTitle}>📍 Location Required</Text>
+      <Text style={styles.modalText}>
+        This app needs location permission to mark your attendance. Please enable it in app settings.
+      </Text>
+      <View style={{ flexDirection: "row", justifyContent: "space-around", marginTop: 20 }}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => {
+            setShowLocationModal(false);
+          }}
+        >
+          <Text style={styles.text}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => {
+            setShowLocationModal(false);
+            Linking.openSettings();
+          }}
+        >
+          <Text style={styles.text}>Go to Settings</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
     </View>
   );
 }
@@ -413,6 +595,25 @@ const styles = StyleSheet.create({
     padding: 10,
     alignSelf: "center",
   },
+  permissionModal: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 15,
+    alignItems: "center",
+    width: width * 0.8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#4B0082",
+    marginBottom: 10,
+  },
+  modalText: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+  },
+  
 });
 
 

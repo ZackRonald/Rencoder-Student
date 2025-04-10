@@ -1,96 +1,98 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, ScrollView, StyleSheet, Dimensions } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import axios from "axios";
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
+import { Picker } from "@react-native-picker/picker";
 
 const { width, height } = Dimensions.get("window");
 
 export default function CourseDetails({ navigation }) {
-  const [courses, setCourses] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("All");
 
-  const fetchCoursesDetails = async () => {
+  const fetchFilteredSubjects = async (status) => {
     try {
       const token = await SecureStore.getItemAsync("authToken");
       const email = await SecureStore.getItemAsync("userEmail");
 
-      if (!token || !email) {
-        console.error("Token or Email missing");
-        return;
-      }
+      if (!token || !email) return;
 
-      const response = await axios.post(
-        "http://192.168.194.158:5000/courseDetails",
-        { studEmail: email },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await axios.get("http://192.168.194.158:5000/filterSubjects", {
+        params: { studEmail: email, status: status === "All" ? undefined : status },
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-      console.log("Fetched Courses:", JSON.stringify(response.data, null, 2));
-
-      if (response.status === 200 && Array.isArray(response.data)) {
-        console.log("Res :",response.data)
-
-        setCourses(response.data);
+      if (response.status === 200) {
+        setSubjects(response.data);
       } else {
-        console.error("Unexpected response format:", response.data);
-        setCourses([]);
+        setSubjects([]);
       }
     } catch (error) {
-      console.error("Error fetching courses:", error.response?.data || error.message);
-      setCourses([]);
+      console.error("Error fetching subjects:", error.response?.data || error.message);
+      setSubjects([]);
     } finally {
       setLoading(false);
     }
   };
 
-
   useFocusEffect(
     useCallback(() => {
-      // Re-fetch courses or attendance when screen becomes active
-      fetchCoursesDetails();
-  
-      return () => {
-        // optional: cleanup when navigating away
-      };
-    }, [])
+      fetchFilteredSubjects(filter);
+    }, [filter])
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.head}>Course Details</Text>
+    <View style={styles.container}>
+      <View style={styles.topBar}>
+        <Text style={styles.head}>Course Details</Text>
+      </View>
 
-      {loading ? (
-        <Text style={styles.loadingText}>Loading...</Text>
-      ) : courses.length > 0 ? (
-        courses.map((course, index) => (
-          <View key={index} style={styles.card}>
-            <Text style={styles.subHead}>Stack: {course.stack || "N/A"}</Text>
-            <Text style={styles.paraH}>Course ID: {course.courseID || "N/A"}</Text>
-            <Text style={styles.paraH}>Start Date: {course.startDate || "N/A"}</Text>
+      <ScrollView >
+        <Picker
+          selectedValue={filter}
+          style={styles.picker}
+          onValueChange={(itemValue) => setFilter(itemValue)}
+        >
+          <Picker.Item label="All" value="All" />
+          <Picker.Item label="Upcoming" value="Upcoming" />
+          <Picker.Item label="In Progress" value="In Progress" />
+          <Picker.Item label="Completed" value="Completed" />
+        </Picker>
 
-            <Text style={styles.subHead}>Subjects</Text>
-            <View style={styles.table}>
-              <View style={styles.row}>
-                <Text style={[styles.cell, styles.tableHead]}>Subject</Text>
-                <Text style={[styles.cell, styles.tableHead]}>Trainer</Text>
-                <Text style={[styles.cell, styles.tableHead]}>Status</Text>
-              </View>
-              {course.subjects?.map((sub, subIndex) => (
-                <View key={subIndex} style={styles.row}>
-                  <Text style={[styles.cell, styles.para]}>{sub.subject || "N/A"}</Text>
-                  <Text style={[styles.cell, styles.para]}>{sub.trainerName || "N/A"}</Text>
-                  <Text style={[styles.cell, styles.para]}>{sub.status || "N/A"}</Text>
+        {loading ? (
+          <Text style={styles.loadingText}>Loading...</Text>
+        ) : subjects.length > 0 ? (
+          subjects.map((subject, index) => (
+            <View key={index} style={styles.subjectCard}>
+              <Text style={styles.subHead}>{subject.stack}</Text>
+              <View style={styles.cardContent}>
+                <View style={styles.cardColumn}>
+                  <Text style={styles.label}>Trainer:</Text>
+                  <Text style={styles.value}>{subject.trainerName || "N/A"}</Text>
+
+                  <Text style={styles.label}>Course ID:</Text>
+                  <Text style={styles.value}>{subject.courseID}</Text>
+
+                  <Text style={styles.label}>Start Date:</Text>
+                  <Text style={styles.value}>{subject.startDate}</Text>
                 </View>
-              ))}
+                <View style={styles.cardColumn}>
+                  <Text style={styles.label}>Status:</Text>
+                  <Text style={styles.value}>{subject.status}</Text>
+
+                  <Text style={styles.label}>Subject:</Text>
+                  <Text style={styles.value}>{subject.subject}</Text>
+                </View>
+              </View>
             </View>
-          </View>
-        ))
-      ) : (
-        <Text style={styles.noDataText}>No courses found.</Text>
-      )}
-    </ScrollView>
+          ))
+        ) : (
+          <Text style={styles.noDataText}>No subjects found.</Text>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -98,89 +100,77 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     backgroundColor: "#8968CD",
-    paddingVertical: 30,
+    flex: 1,
+  },
+  topBar: {
+    backgroundColor: "#9400D3",
+    width: "100%",
+    paddingVertical: height * 0.02,
+    alignItems: "center",
   },
   head: {
-    
-    fontSize: 34,
+    fontSize: width * 0.08,
     fontWeight: "bold",
-    color: "#FFD700",
-    textAlign: "center",
-    top:20,
-    marginBottom: 20,
+    color: "white",
+  },
+  picker: {
+    width: width * 0.45,
+    marginVertical: height * 0.02,
+    backgroundColor: "#D8BFD8",
+    color: "#4B0082",
+    borderRadius: 10,
+    alignSelf: "flex-end",
+  },
+  subjectCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    padding: width * 0.05,
+    borderRadius: 20,
+    marginBottom: height * 0.025,
+    width: width * 0.95,
+    alignSelf: "center",
+    borderColor: "#FFD700",
+    borderWidth: 1,
+    shadowColor: "#fff",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   subHead: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  paraH: {
-    color: "#D1C4E9",
-    fontSize: 20,
-    textAlign: "center",
-    fontWeight: "600",
-    marginBottom: 5,
-  },
-  para: {
-    color: "#EDE7F6",
-    fontSize: 16,
-    textAlign: "center",
-    fontWeight: "600",
-  },
-  card: {
-    top:20,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
-    padding: 20,
-    borderRadius: 20,
-    shadowColor: "#00FFFF",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-    width: width * 0.9,
-    marginBottom: 20,
-    alignSelf: "center",
-  },
-  table: {
-    marginTop: 15,
-    borderRadius: 10,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    padding: 10,
-    width: width * 0.85,
-    alignSelf: "center",
-  },
-  row: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.3)",
-    paddingVertical: 10,
-  },
-  cell: {
-    flex: 1,
-    textAlign: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 5,
-    minWidth: width * 0.25,
-    flexShrink: 1,
-  },
-  tableHead: {
+    fontSize: width * 0.06,
     fontWeight: "bold",
     color: "#FFD700",
-    fontSize: 18,
+    textAlign: "center",
+    marginBottom: height * 0.015,
+  },
+  cardContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: width * 0.05,
+  },
+  cardColumn: {
+    flex: 1,
+  },
+  label: {
+    fontSize: width * 0.04,
+    color: "#EDE7F6",
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  value: {
+    fontSize: width * 0.042,
+    color: "#fff",
+    marginBottom: height * 0.01,
   },
   loadingText: {
     fontSize: 18,
     color: "#FFFFFF",
     textAlign: "center",
-    marginTop: 10,
+    marginTop: 20,
   },
   noDataText: {
     fontSize: 18,
     color: "#FFD700",
     textAlign: "center",
-    marginTop: 10,
+    marginTop: 20,
   },
 });
