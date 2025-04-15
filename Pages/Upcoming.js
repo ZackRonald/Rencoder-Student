@@ -22,7 +22,7 @@ function Upcoming() {
       }
 
       const response = await axios.post(
-        "http://192.168.194.158:5000/subjects",
+        "http://192.168.1.4:5000/subjects",
         { studEmail: email },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -127,14 +127,10 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 32,
     fontWeight: "bold",
-    color: "#FFFFFF",
+    color: "#8968CD",
     marginBottom: 20,
-    textAlign: "center",
-    textShadowColor: "rgba(0, 0, 0, 0.4)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
-    left:10,
-    top:5
+    left: 50,
+    top: 10,
   },
   cards: {
     backgroundColor: "#4B0082",
@@ -191,7 +187,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   topBar: {
-    backgroundColor: "#9400D3",
+    backgroundColor: "white",
     
     flexDirection: "row",
     justifyContent: "space-between",

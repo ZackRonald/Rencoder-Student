@@ -6,6 +6,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import axios from "axios";
 import { useNavigation } from '@react-navigation/native';
+import FontAwesome from 'react-native-vector-icons/FontAwesome';
 
 function Navigations() {
   const navigation = useNavigation();
@@ -44,6 +45,11 @@ function Navigations() {
       <TouchableOpacity style={styles.card}  onPress={() => navigation.navigate('Payment')}>
         <Ionicons name="card" size={40} color="#8968CD" />
         <Text style={styles.label}>Payment</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.card}  onPress={() => navigation.navigate('Certificate')}>
+      <FontAwesome name="certificate" size={40} color="#8968CD" />
+      <Text style={styles.label}>Certificate</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.card} onPress={handleLogout}>

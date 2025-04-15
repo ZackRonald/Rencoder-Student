@@ -6,12 +6,14 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as SecureStore from "expo-secure-store";
 import axios from "axios";
 import Icon from "react-native-vector-icons/Ionicons";
+import Font from 'react-native-vector-icons/FontAwesome5';
 import { Dimensions } from "react-native";
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import * as Location from 'expo-location';
 import { Linking } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 const { width, height } = Dimensions.get("window");
 
@@ -19,7 +21,7 @@ export default function HomeScreen({ navigation }) {
   const [location, setLocation] = useState();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [facing, setFacing] = useState("back");
+  const [facing, setFacing] = useState("front");
   const [permission, requestPermission] = useCameraPermissions();
   const [notificationPermission, setNotificationPermission] = useState(null);
   const [isCameraModalVisible, setCameraModalVisible] = useState(false);
@@ -30,294 +32,360 @@ export default function HomeScreen({ navigation }) {
   const [showLocationModal, setShowLocationModal] = useState(false);
 const [activate, setActivate] = useState(false);
 
-  const setupNotifications = async (courses) => {
-    try {
-      const now = new Date();
-      const dayOfWeek = now.getDay(); // Sunday = 0, Monday = 6
-      if (dayOfWeek === 0 || dayOfWeek === 6) return; // Skip weekends
-  
-      // Cancel all previous notifications to prevent duplicates
-      await Notifications.cancelAllScheduledNotificationsAsync();
-  
-      // Loop through courses and subjects to find "In Progress" ones
-      courses.forEach(course => {
-        course.subjects.forEach(subject => {
-          if (subject.status === "In Progress") {
-            const [time, meridian] = subject.time.split(/(AM|PM)/i); // e.g., "2:00", "PM"
-            const [hoursStr, minutesStr] = time.split(":");
-            let hours = parseInt(hoursStr, 10);
-            const minutes = parseInt(minutesStr, 10);
-  
-            // Convert to 24-hour format
-            if (meridian.toUpperCase() === "PM" && hours < 12) hours += 12;
-            if (meridian.toUpperCase() === "AM" && hours === 12) hours = 0;
-  
-            const triggerDate = new Date();
-            triggerDate.setHours(hours);
-            triggerDate.setMinutes(minutes);
-            triggerDate.setSeconds(0);
-  console.log(triggerDate);
-  
-            // Schedule only if the time is later than now
-            if (triggerDate > now) {
-              Notifications.scheduleNotificationAsync({
-                content: {
-                  title: `📸 ${subject.subject} Attendance`,
-                  body: `Class for ${subject.subject} is starting soon. Don't forget to mark attendance!`,
-                  data: { screen: "HomeScreen" },
-                },
-                trigger: triggerDate,
-              });
-  
-              console.log(`📅 Notification scheduled for ${subject.subject} at ${triggerDate}`);
-            }
+const setupNotifications = async (courses) => {
+  try {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // Sunday = 0, Monday = 6
+    if (dayOfWeek === 0 || dayOfWeek === 6) return; // Skip weekends
+
+    // Cancel all previous notifications to prevent duplicates
+    await Notifications.cancelAllScheduledNotificationsAsync();
+
+    // Loop through courses and subjects to find "In Progress" ones
+    courses.forEach(course => {
+      course.subjects.forEach(subject => {
+        if (subject.status === "In Progress") {
+          const [time, meridian] = subject.time.split(/(AM|PM)/i); // e.g., "2:00", "PM"
+          const [hoursStr, minutesStr] = time.split(":");
+          let hours = parseInt(hoursStr, 10);
+          const minutes = parseInt(minutesStr, 10);
+
+          // Convert to 24-hour format
+          if (meridian.toUpperCase() === "PM" && hours < 12) hours += 12;
+          if (meridian.toUpperCase() === "AM" && hours === 12) hours = 0;
+
+          const triggerDate = new Date();
+          triggerDate.setHours(hours);
+          triggerDate.setMinutes(minutes);
+          triggerDate.setSeconds(0);
+console.log(triggerDate);
+
+          // Schedule only if the time is later than now
+          if (triggerDate > now) {
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: `📸 ${subject.subject} Attendance`,
+                body: `Class for ${subject.subject} is starting soon. Don't forget to mark attendance!`,
+                data: { screen: "HomeScreen" },
+              },
+              trigger: triggerDate,
+            });
+
+            console.log(`📅 Notification scheduled for ${subject.subject} at ${triggerDate}`);
           }
-        });
+        }
       });
-    } catch (error) {
-      console.error("❌ Failed to schedule notifications:", error);
-    }
-  };
-  
-  const fetchTodayAttendance = async () => {
-    try {
-      const token = await SecureStore.getItemAsync("authToken");
-      const email = await SecureStore.getItemAsync("userEmail");
-      if (!token || !email) return;
+    });
+  } catch (error) {
+    console.error("❌ Failed to schedule notifications:", error);
+  }
+};
 
-      const res = await axios.post("http://192.168.194.158:5000/getAttendance", { studEmail: email }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+const fetchTodayAttendance = async () => {
+  try {
+    const token = await SecureStore.getItemAsync("authToken");
+    const email = await SecureStore.getItemAsync("userEmail");
 
-      setTodayAttendance(res.data.attendance || []);
-    } catch (error) {
-      console.error("Error fetching attendance:", error.response?.data || error.message);
-    }
-  };
-
-  const openCameraModal = async (subject, stack) => {
-    const { status } = await Location.getForegroundPermissionsAsync();
-
-    if (status !== "granted") {
-      setShowLocationModal(true);
+    if (!token || !email) {
+      const setupNotifications = async (courses) => {
+        try {
+          const now = new Date();
+          const dayOfWeek = now.getDay(); // Sunday = 0, Monday = 6
+          if (dayOfWeek === 0 || dayOfWeek === 6) return; // Skip weekends
+      
+          // Cancel all previous notifications to prevent duplicates
+          await Notifications.cancelAllScheduledNotificationsAsync();
+      
+          // Loop through courses and subjects to find "In Progress" ones
+          courses.forEach(course => {
+            course.subjects.forEach(subject => {
+              if (subject.status === "In Progress") {
+                const [time, meridian] = subject.time.split(/(AM|PM)/i); // e.g., "2:00", "PM"
+                const [hoursStr, minutesStr] = time.split(":");
+                let hours = parseInt(hoursStr, 10);
+                const minutes = parseInt(minutesStr, 10);
+      
+                // Convert to 24-hour format
+                if (meridian.toUpperCase() === "PM" && hours < 12) hours += 12;
+                if (meridian.toUpperCase() === "AM" && hours === 12) hours = 0;
+      
+                const triggerDate = new Date();
+                triggerDate.setHours(hours);
+                triggerDate.setMinutes(minutes);
+                triggerDate.setSeconds(0);
+                triggerDate.setMilliseconds(0);
+      
+                // Log trigger date for debugging
+                console.log(triggerDate);
+      
+                // Schedule only if the time is later than now
+                if (triggerDate > now) {
+                  Notifications.scheduleNotificationAsync({
+                    content: {
+                      title: `📸 ${subject.subject} Attendance`,
+                      body: `Class for ${subject.subject} is starting soon. Don't forget to mark attendance!And Your trainer is ${subject.trainerName} is waiting in the class`,
+                      data: { screen: "HomeScreen" },
+                    },
+                    trigger: {
+                      type: 'date',
+                      timestamp: triggerDate.getTime(),
+                    },
+                  });
+      
+                  console.log(`📅 Notification scheduled for ${subject.subject} at ${triggerDate}`);
+                }
+              }
+            });
+          });
+        } catch (error) {
+          console.error("❌ Failed to schedule notifications:", error);
+        }
+      };
+      setLoading(false);
       return;
     }
-    console.log("Pressmission granted");
-    
-    console.log("ACtivation",activate);
-    setActivate(!activate);
-    console.log("Sctivstivon",activate);
-    
-    checkLocationAndOpenCamera(subject, stack);
-  };
 
-  
-  useEffect(() => {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-      }),
-    });
-  }, []);
-  
-  useFocusEffect(
-    useCallback(() => {
-      const requestNotifPermissions = async () => {
-        const { status } = await Notifications.requestPermissionsAsync();
-        if (status === "granted") {
-          setNotificationPermission(status);
-        } else {
-          alert("Notification permission denied");
-        }
-      };
-  
-     
-      const initialize = async () => {
-        setLoading(true); // Start loading before all requests
-      
-        try {
-          await requestNotifPermissions();
-          const fetchedCourses = await fetchCourses(); // setCourses handled here
-          await fetchTodayAttendance();
-          await setupNotifications(fetchedCourses);
-        } catch (error) {
-          console.error("Initialization failed:", error);
-        } finally {
-          setLoading(false); // End loading after all are complete
-        }
-      };
-      initialize();
-  
-      // Optional cleanup if needed
-      return () => {
-        // cleanup logic if required
-      };
-    }, [])
-  );
-  // useEffect(() => {
-  //   const requestLocationPermission = async () => {
-  //     console.log("Entered location permission request");
-      
-  //     const { status } = await Location.requestForegroundPermissionsAsync();
-  //     if (status === "granted") {
-  //       const loc = await Location.getCurrentPositionAsync({});
-  //       setLocation(loc);
-  //       console.log("Location:", loc);
-        
-  //     } else {
-  //       alert("Location permission denied");
-  //       return;
-  //     }
-  //   }
-  //   requestLocationPermission();
-  // },[activate])
-  
-  const toggleCameraFacing = () => setFacing(f => f === "back" ? "front" : "back");
+    const response = await axios.post(
+      "http://192.168.1.4:5000/getAttendance",
+      { studEmail: email },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-
-
-  const closeCameraModal = () => setCameraModalVisible(false);
-
-  const fetchCourses = async () => {
-    try {
-      const token = await SecureStore.getItemAsync("authToken");
-      const email = await SecureStore.getItemAsync("userEmail");
-  
-      if (!token || !email) {
-        console.error("Token or Email not found");
-        setLoading(false);
-        return [];
-      }
-  
-      const response = await axios.get("http://192.168.194.158:5000/getCourse", {
-        params: { studEmail: email },
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-  
-      console.log("Full Response", response.data);
-  
-      const fetchedCourses = response.data.courses || [];
-  
-      const longi = response.data.targetLog;
-      const lati = response.data.targetLat;
-      
-      if (lati && longi) {
-        await SecureStore.setItemAsync("targetLat", lati.toString());
-        await SecureStore.setItemAsync("targetLog", longi.toString());
-        console.log("✅ Stored lat/log:", lati, longi);
-      } else {
-        console.error("❌ Missing lat/log from API:", lati, longi);
-      }
-  
-      setCourses(fetchedCourses);
-  
-      return fetchedCourses; // So it still works with setupNotifications()
-    } catch (error) {
-      console.error("Error fetching courses:", error.response?.data || error.message);
-      return [];
-    } finally {
-      setLoading(false);
+    if (response.status === 200 && Array.isArray(response.data.attendance)) {
+      setTodayAttendance(response.data.attendance);
+    } else {
+      setTodayAttendance([]);
     }
-  };
-  
+    console.log("Notifiacton"); 
+    
+  } catch (error) {
+    Toast.show({
+      type: 'error',
+      text1: 'Error Fetching Attendance',
+      text2: error?.response?.data || error?.message,
+    });
+    setTodayAttendance([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const takePicture = async () => {
-    if (!cameraRef.current) return;
+const openCameraModal = async (subject, stack) => {
+  const { status } = await Location.getForegroundPermissionsAsync();
+
+  if (status !== "granted") {
+    setShowLocationModal(true);
+    return;
+  }
+
+  setActivate(!activate);
+  checkLocationAndOpenCamera(subject, stack);
+};
+
+useEffect(() => {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}, []);
+
+useFocusEffect(
+  useCallback(() => {
+    const requestNotifPermissions = async () => {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === "granted") {
+        setNotificationPermission(status);
+      } else {
+        Toast.show({
+          type: 'info',
+          text1: 'Notifications',
+          text2: 'Permission denied',
+        });
+      }
+    };
+
+    const initialize = async () => {
+      setLoading(true);
+      try {
+        await requestNotifPermissions();
+        const fetchedCourses = await fetchCourses();
+        await fetchTodayAttendance();
+        await setupNotifications(fetchedCourses);
+      } catch (error) {
+        Toast.show({
+          type: 'error',
+          text1: 'Initialization Failed',
+          text2: error.message,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initialize();
+  }, [])
+);
+
+const closeCameraModal = () => setCameraModalVisible(false);
+
+const fetchCourses = async () => {
+  try {
+    const token = await SecureStore.getItemAsync("authToken");
+    const email = await SecureStore.getItemAsync("userEmail");
+
+    if (!token || !email) {
+      Toast.show({
+        type: 'error',
+        text1: 'Auth Error',
+        text2: 'Missing token or email',
+      });
+      setLoading(false);
+      return [];
+    }
+
+    const response = await axios.get("http://192.168.1.4:5000/getCourse", {
+      params: { studEmail: email },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const { courses = [], targetLat, targetLog } = response.data;
+
+    if (targetLat && targetLog) {
+      await SecureStore.setItemAsync("targetLat", targetLat.toString());
+      await SecureStore.setItemAsync("targetLog", targetLog.toString());
+    } else {
+      Toast.show({
+        type: 'info',
+        text1: 'Missing Target Coordinates',
+      });
+    }
+
+    setCourses(courses);
+    return courses;
+  } catch (error) {
+    Toast.show({
+      type: 'error',
+      text1: 'Course Fetch Failed',
+      text2: error?.response?.data || error.message,
+    });
+    return [];
+  } finally {
+    setLoading(false);
+  }
+};
+
+const takePicture = async () => {
+  if (!cameraRef.current) return;
+
+  try {
     const photo = await cameraRef.current.takePictureAsync({ base64: true });
     const token = await SecureStore.getItemAsync("authToken");
+const studEmail = await SecureStore.getItemAsync("userEmail");
+    if (!token) {
+      Toast.show({
+        type: 'error',
+        text1: 'Auth Error',
+        text2: 'Authentication token missing.',
+      });
+      return;
+    }
 
     const payload = {
+      studEmail: studEmail,
       image: photo.base64,
       subjectName: currentSubjectName,
       stackName: currentStackName,
     };
 
-    try {
-      await axios.post("http://192.168.194.158:5000/attendance", payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-      alert("Attendance marked successfully!");
-      closeCameraModal();
-      fetchTodayAttendance();
-    } catch (error) {
-      console.error("Attendance marking failed:", error.response?.data || error.message);
-      alert("Failed to mark attendance.");
-    }
-  };
+    const response = await axios.post("http://192.168.1.4:5000/attendance", payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-  const checkLocationAndOpenCamera = async (subject, stack) => {
-    console.log("📍 Checking location...");
-  
-    let latitude, longitude;
-  
-    try {
-      setLoading(true);
-      const loc = await Location.getCurrentPositionAsync({});
-      latitude = loc.coords.latitude;
-      longitude = loc.coords.longitude;
-    } catch (error) {
-      console.log(error);
-      alert("Failed to get your location.");
-      return;
-    } finally {
-      setLoading(false);
-    }
-  
-    // Get target location from SecureStore
+    Toast.show({
+      type: 'success',
+      text1: 'Attendance Marked',
+      text2: response.data.message || 'Success',
+    });
+
+    closeCameraModal();
+    fetchTodayAttendance();
+  } catch (error) {
+    Toast.show({
+      type: 'error',
+      text1: 'Attendance Failed',
+      text2: error.response?.data || error.message,
+    });
+  }
+};
+
+const checkLocationAndOpenCamera = async (subject, stack) => {
+  try {
+    setLoading(true);
+    const loc = await Location.getCurrentPositionAsync({});
+    const { latitude, longitude } = loc.coords;
+
     const latStr = await SecureStore.getItemAsync("targetLat");
     const logStr = await SecureStore.getItemAsync("targetLog");
-  
-    console.log("Retrieved raw lat/lng:", latStr, logStr);
-  
+
     const targetLat = parseFloat(latStr);
     const targetLog = parseFloat(logStr);
-  
+
     if (!targetLat || !targetLog) {
-      alert("Target location not set.");
+      Toast.show({
+        type: 'error',
+        text1: 'Target Not Set',
+        text2: 'Target location is missing.',
+      });
       return;
     }
-  
+
     const distance = getDistanceFromLatLonInMeters(latitude, longitude, targetLat, targetLog);
-  
-    console.log(`📏 Distance from target: ${distance.toFixed(2)} meters`);
-  
+
     if (distance <= 100) {
-      console.log("✅ Within 100m range. Opening camera...");
       setCurrentSubjectName(subject);
       setCurrentStackName(stack);
       setCameraModalVisible(true);
     } else {
-      console.log("❌ Not within range.");
-      alert("You are not near the location to mark attendance.");
+      Toast.show({
+        type: 'error',
+        text1: 'Out of Range',
+        text2: 'Move closer to the target location.',
+      });
     }
-  };
-  
-  
-  const getDistanceFromLatLonInMeters = (lat1, lon1, lat2, lon2) => {
-    const R = 6371e3; // Radius of the earth in meters
-    const toRad = (value) => (value * Math.PI) / 180;
-  
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-  
-    const a =Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) *
-        Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-  
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-  
-    return distance; // in meters
-  };
-  if (loading) {
+  } catch (error) {
+    Toast.show({
+      type: 'error',
+      text1: 'Location Error',
+      text2: 'Could not get your current location.',
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
+const getDistanceFromLatLonInMeters = (lat1, lon1, lat2, lon2) => {
+  const R = 6371e3;
+  const toRad = (value) => (value * Math.PI) / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+if (loading) {
     return (
       <Modal
   transparent={true}
@@ -339,7 +407,9 @@ const [activate, setActivate] = useState(false);
   return (
     <View style={styles.scrollContainer}>
       <StatusBar backgroundColor="#4B0082" barStyle="light-content" />
+
       <Navbar navigation={navigation} />
+      
 <ScrollView>
       <View style={styles.card}>
         <Text style={styles.title}>Welcome to Rencoders</Text>
@@ -405,7 +475,7 @@ const [activate, setActivate] = useState(false);
                           onPress={() => openCameraModal(subject.subject, course.stack)}
                           style={styles.iconButton}
                         >
-                          <Icon name="camera-reverse-outline" size={30} color="#fff" />
+                          <Icon name="camera" size={30} color="#fff" />
                         </TouchableOpacity>
                         
                         )}
@@ -420,20 +490,24 @@ const [activate, setActivate] = useState(false);
         
       </View>
       </ScrollView>
-      <Modal visible={isCameraModalVisible} animationType="slide" transparent={true}>
+
+<Modal visible={isCameraModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalContainer}>
+          <TouchableOpacity style={styles.closeButton} onPress={closeCameraModal}>
+          <Icon name="close" size={60} color="#fff" />
+          </TouchableOpacity>
           <View style={styles.cameraWrapper}>
             <CameraView ref={cameraRef} style={{ flex: 1 }} facing={facing}>
               <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
-                  <Text style={styles.text}>Flip</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.button} onPress={closeCameraModal}>
-                  <Text style={styles.text}>Close</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.button} onPress={takePicture}>
-                  <Text style={styles.text}>Click</Text>
-                </TouchableOpacity>
+              
+              
+                <TouchableOpacity style={styles.shutterButton} onPress={takePicture}>
+  <View style={styles.shutterOuter}>
+    <View style={styles.shutterInner} />
+  </View>
+</TouchableOpacity>
+
+
               </View>
             </CameraView>
           </View>
@@ -444,7 +518,7 @@ const [activate, setActivate] = useState(false);
       <Modal visible={showLocationModal} transparent animationType="fade">
   <View style={styles.modalContainer}>
     <View style={styles.permissionModal}>
-      <Text style={styles.modalTitle}>📍 Location Required</Text>
+      <Text style={styles.modalTitle}>📍Location Required</Text>
       <Text style={styles.modalText}>
         This app needs location permission to mark your attendance. Please enable it in app settings.
       </Text>
@@ -475,20 +549,18 @@ const [activate, setActivate] = useState(false);
   );
 }
 
-// Keep your styles here unchanged...
-
-
-
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
+    shadowColor: "#00FFFF",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 15,
+    borderWidth: 1.5,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    borderColor: "rgba(255, 255, 255, 0.3)",
     padding: 20,
     borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 5,
+    
     margin: 20,
     position: "relative",
     top: 20,
@@ -518,12 +590,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "rgba(255, 255, 255, 0.3)",
     marginVertical: 15,
-    alignSelf: "center", // ✨ better for centering than left/right
+    alignSelf: "center", 
   },
 
   description: {
     fontSize: 16,
-    color: "#333",
+    color: "white",
     textAlign: "center",
   },
   row: {
@@ -576,7 +648,7 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: "row",
     justifyContent: "space-around",
-    backgroundColor: "rgba(0,0,0,0.5)",
+   
     paddingVertical: 10,
   },
   button: {
@@ -614,6 +686,32 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   
-});
+  shutterButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  shutterOuter: {
+    width: width*0.2,
+    height: height*0.1,
+    borderRadius: 35,
+    borderWidth: 5,
+    borderColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shutterInner: {
+    width: width*0.15,
+    height: height*0.07,
+    borderRadius: 25,
+    backgroundColor: '#fff',
+  },
+closeButton:{
+  
+  fontWeight:"bold",
+  position:"absolute",
+  top: 20,
+  left: 280,
+}});
 
 

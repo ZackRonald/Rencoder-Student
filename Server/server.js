@@ -33,6 +33,25 @@ const db = client.db("Rencoder");
 const stud = db.collection("Student");
 app.use('/uploads', express.static('uploads'));
 
+// Middleware to verify JWT token
+function verifyToken(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1]; // Expected format: "Bearer <token>"
+
+  if (!token) {
+      return res.status(401).json({ message: "Access token is missing" });
+  }
+
+  try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded; // Attach decoded payload to request
+      next(); // Proceed to the route handler
+  } catch (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+  }
+}
+
+
 app.post("/login", async (req, res) => {
     try {
         console.log("Enter Db");
@@ -73,7 +92,7 @@ app.post("/login", async (req, res) => {
     }
 });
 
-app.post("/subjects", async (req, res) => {
+app.post("/subjects",verifyToken, async (req, res) => {
     console.log("Enter the API");
 
     try {
@@ -94,199 +113,231 @@ console.error("Error inserting attendance:", error.response?.data || error.messa
         await client.close();
     }
 });
+app.post("/attendance", verifyToken, async (req, res) => {
+  try {
+    await client.connect();
+    console.log("Enter the attendance API");
 
-app.post("/attendance", async (req, res) => {
-    try {
-      await client.connect();
-      console.log("Enter the attendance API");
-  
-      const token = req.headers.authorization?.split(" ")[1];
-  
-      if (!token) {
-        return res.status(401).json({ error: "Unauthorized: No token provided" });
-      }
-  
-      let decoded;
-      try {
-        decoded = jwt.verify(token, JWT_SECRET);
-      } catch (err) {
-        return res.status(403).json({ error: "Invalid token" });
-      }
-  
-      const studentEmail = decoded.email;
-      const { image, subjectName, stackName } = req.body;
-  
-      if (!subjectName || !stackName || !image) {
-        return res.status(400).json({ error: "Subject, stack, and image are required" });
-      }
-  
-      // Make sure folder exists
-      const folderPath = path.join(__dirname, "attendance_images");
-      if (!fs.existsSync(folderPath)) {
-        fs.mkdirSync(folderPath);
-      }
-  
-      const imageBuffer = Buffer.from(image, 'base64');
-      const filename = `${subjectName}_${stackName}_${Date.now()}.jpg`;
-      const filepath = path.join(folderPath, filename);
-      fs.writeFileSync(filepath, imageBuffer);
-  
-      const newAttendance = {
-        date: new Date().toISOString().split("T")[0],
-        stack: stackName,
-        subject: subjectName,
-        status: "Present",
-        imagePath: filepath,
-      };
-  
-console.log(newAttendance);
-const updatedStudent = await stud.updateOne(
-    {
-      studEmail: studentEmail,
+    const { studEmail, image, subjectName, stackName } = req.body;
+
+    if (!subjectName || !stackName || !image || !studEmail) {
+      console.log("Missing required fields");
+      return res.status(400).json({ error: "Subject, stack, image, and student email are required" });
+    }
+    console.log("Received data:", req.body);
+
+    // Ensure image folder exists
+    const folderPath = path.join(__dirname, "attendance_images");
+    if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath);
+
+    const imageBuffer = Buffer.from(image, 'base64');
+    const filename = `${subjectName}_${stackName}_${Date.now()}.jpg`;
+    const filepath = path.join(folderPath, filename);
+    fs.writeFileSync(filepath, imageBuffer);
+
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+
+    // Step 1: Get last attendance date
+    console.log("Entering Step 1");
+    
+    const studentDoc = await stud.findOne({
+      studEmail: studEmail,
       "courses.stack": stackName,
       "courses.subjects.subject": subjectName
-    },
-    {
-      $push: {
-        "courses.$[course].subjects.$[subject].attendance": newAttendance
-      }
-    },
-    {
-      arrayFilters: [
-        { "course.stack": stackName },
-        { "subject.subject": subjectName }
-      ]
-    }
-  );
-  
-  
-      console.log(updatedStudent);
-      
-      const result = await stud.updateOne(
-        { studEmail: studentEmail, "courses.stack": stackName },
-        {
-          $inc: { "courses.$[course].subjects.$[subject].attendanceCount": 1 }
-        },
-        {
-          arrayFilters: [
-            { "course.stack": stackName },
-            { "subject.subject": subjectName }
-          ]
+    });
+
+    const subjectData = studentDoc?.courses?.find(course => course.stack === stackName)
+      ?.subjects?.find(sub => sub.subject === subjectName);
+console.log("Subject Data:", subjectData);
+
+    const attendance = subjectData?.attendance || [];
+console.log("Attendance Records:", attendance);
+const lastDate= attendance.map(a => a.date).sort();
+console.log("Last Date Array:", lastDate);
+    let lastDateStr = attendance.map(a => a.date).sort().pop();
+console.log("Last Date:", lastDateStr);
+
+    const newAttendances = [];
+
+    // Step 2: Backfill "Absent" dates for missed weekdays (excluding lastDate and today)
+    console.log("Entering Step 2");
+    
+    if (lastDateStr && lastDateStr !== todayStr) {
+      let lastDate = new Date(lastDateStr);
+      let nextDate = new Date(lastDate);
+      nextDate.setDate(lastDate.getDate() + 1); // Start from next day
+    
+      // Generate date list between lastDate and today
+      const dateList = [];
+      while (nextDate < today) {
+        const day = nextDate.getDay(); // 0 = Sunday, 6 = Saturday
+        if (day !== 0 && day !== 6) { // Weekdays only
+          const yyyy = nextDate.getFullYear();
+          const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
+          const dd = String(nextDate.getDate()).padStart(2, '0');
+          const formatted = `${yyyy}-${mm}-${dd}`;
+          dateList.push(formatted);
         }
-      );
+        nextDate.setDate(nextDate.getDate() + 1);
+        console.log("Date List",dateList);
+      }
+      console.log("Date List",dateList);
       
-      console.log("Matched:", result.matchedCount);
-      console.log("Modified:", result.modifiedCount);
-  
-      console.log("Attendance inserted:", updatedStudent.modifiedCount);
-      res.status(200).json({ message: "Attendance marked successfully" });
-  
-    } catch (err) {
-      console.error("Error:", err);
-      res.status(500).json({ error: "Internal server error" });
-    } finally {
-      await client.close();
+    
+      // Loop through dateList using forEach and push if not in attendance
+      dateList.forEach(formatted => {
+        if (!attendance.some(entry => entry.date === formatted)) {
+          newAttendances.push({
+            date: formatted,
+            stack: stackName,
+            subject: subjectName,
+            status: "Absent",
+            imagePath: null
+          });
+        }
+      });
+    
+      // Log Absent Dates
+
     }
-  });
+
+
+    // Step 3: Add today's Present record
+    const todayAttendance = attendance.find(a => a.date === todayStr);
+console.log("Today's Attendance:", todayAttendance);
+
+    if (!todayAttendance) {
+      newAttendances.push({
+        date: todayStr,
+        stack: stackName,
+        subject: subjectName,
+        status: "Absent", // Mark Absent first
+        imagePath: null
+      });
+
+      newAttendances.push({
+        date: todayStr,
+        stack: stackName,
+        subject: subjectName,
+        status: "Present", // Mark Present after
+        imagePath: filepath
+      });
+    } else {
+      if (todayAttendance.status !== "Present") {
+        todayAttendance.status = "Present";
+        todayAttendance.imagePath = filepath;
+        newAttendances.push(todayAttendance);
+      }
+    }
+
+    // Step 4: Push to DB
+    const updatedStudent = await stud.updateOne(
+      {
+        studEmail: studEmail,
+        "courses.stack": stackName,
+        "courses.subjects.subject": subjectName
+      },
+      {
+        $push: {
+          "courses.$[course].subjects.$[subject].attendance": { $each: newAttendances }
+        }
+      },
+      {
+        arrayFilters: [
+          { "course.stack": stackName },
+          { "subject.subject": subjectName }
+        ]
+      }
+    );
+
+    // Step 5: Update attendanceCount for Present only
+    const presentCount = newAttendances.filter(a => a.status === "Present").length;
+
+    const result = await stud.updateOne(
+      {
+        studEmail: studEmail,
+        "courses.stack": stackName
+      },
+      {
+        $inc: {
+          "courses.$[course].subjects.$[subject].attendanceCount": presentCount
+        }
+      },
+      {
+        arrayFilters: [
+          { "course.stack": stackName },
+          { "subject.subject": subjectName }
+        ]
+      }
+    );
+
+
+    res.status(200).json({ message: "Attendance marked successfully" });
+
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  } finally {
+    await client.close();
+  }
+});
+
+
+
+
  
-app.post("/getAttendance", async (req, res) => {
-    try {
-      const { studEmail } = req.body;
-  
-      console.log("Fetching attendance records...");
-  
-      try{
-        
-        
-        await client.connect();
-        
-        console.log("Entered The try block");
-      }
+app.post("/getAttendance", verifyToken, async (req, res) => {
+  try {
+    const { studEmail } = req.body;
+    console.log("Fetching attendance records...");
 
-      catch(error){
-        console.log("enter the catch block");
-        console.log("Error",error);
-      }
+    await client.connect();
+    
+    const student = await stud.findOne({ studEmail });
+    if (!student) return res.status(404).json({ error: "Student not found" });
 
-      const student = await stud.findOne({ studEmail });
-      if (!student) return res.status(404).json({ error: "Student not found" });
-  
-      const today = new Date().toISOString().split("T")[0];
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split("T")[0];
-  
-      const absentRecords = [];
-  
-      for (const course of student.courses || []) {
-        for (const subject of course.subjects || []) {
-          const subjectAttendance = Array.isArray(subject.attendance) ? subject.attendance : [];
-  
-          const markedYesterday = subjectAttendance.some(att => att.date === yesterdayStr);
-  
-          if (!markedYesterday && subject.status === "In Progress") {
-            absentRecords.push({
-              courseIndex: student.courses.indexOf(course),
-              subjectIndex: course.subjects.indexOf(subject),
-              absentRecord: {
-                date: yesterdayStr,
-                stack: course.stack,
-                subject: subject.subject,
-                status: "Absent",
-                imagePath: null
-              }
-            });
+    const today = new Date().toISOString().split("T")[0];
+    const todayAttendance = [];
+
+    for (const course of student.courses || []) {
+      for (const subject of course.subjects || []) {
+        const subjectAttendance = Array.isArray(subject.attendance) ? subject.attendance : [];
+
+        console.log(`Checking subject: ${subject.subject}`);
+        console.log("Attendance array:", subjectAttendance);
+
+        for (const att of subjectAttendance) {
+          console.log(`Comparing: record date = ${att.date}, today = ${today}`);
+          if (att.date === today) {
+            todayAttendance.push(att);
           }
         }
       }
-  
-      for (const rec of absentRecords) {
-        const { courseIndex, subjectIndex, absentRecord } = rec;
-        const attendancePath = `courses.${courseIndex}.subjects.${subjectIndex}.attendance`;
-  
-        // Sanitize: Ensure target path is an array
-        const doc = await stud.findOne({ studEmail });
-        const currentVal = (((doc.courses || [])[courseIndex] || {}).subjects || [])[subjectIndex]?.attendance;
-  
-        if (!Array.isArray(currentVal)) {
-          await stud.updateOne(
-            { studEmail },
-            { $set: { [attendancePath]: [] } }
-          );
-        }
-  
-        await stud.updateOne(
-          { studEmail },
-          { $push: { [attendancePath]: absentRecord } }
-        );
-      }
-  
-      const updatedStudent = await stud.findOne({ studEmail });
-      const todayAttendance = [];
-  
-      for (const course of updatedStudent.courses || []) {
-        for (const subject of course.subjects || []) {
-          const subjectAttendance = Array.isArray(subject.attendance) ? subject.attendance : [];
-          for (const att of subjectAttendance) {
-            if (att.date === today) {
-              todayAttendance.push(att);
-            }
-          }
-        }
-      }
-  
-      console.log("Today's Attendance:", todayAttendance);
-      res.status(200).json({ attendance: todayAttendance });
-  
-    } catch (err) {
-      console.error("Error fetching attendance:", err);
-      res.status(500).json({ error: "Internal Server Error" });
-    } finally {
-      await client.close();
     }
-  });
+
+    console.log("Today's Attendance:", todayAttendance);
+
+    // Send response only after checking for attendance
+    if (todayAttendance.length === 0) {
+      return res.status(200).json({ message: "No attendance found for today." });
+    }
+
+    res.status(200).json({ attendance: todayAttendance });
+    console.log("Exit");
+    
+
+  } catch (err) {
+    console.error("Error fetching attendance:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  } finally {
+    await client.close();
+  }
+});
+
+
   
-app.get("/courseDetails", async (req, res) => {
+app.get("/courseDetails",verifyToken, async (req, res) => {
     console.log("Enterede the Course Details API");
     
     try {
@@ -324,7 +375,7 @@ app.get("/courseDetails", async (req, res) => {
     }
 });
 
-app.post('/updateProfile', upload.single('profileImage'), async (req, res) => {
+app.post('/updateProfile',verifyToken, upload.single('profileImage'), async (req, res) => {
     try {
        
         
@@ -376,31 +427,32 @@ app.post('/updateProfile', upload.single('profileImage'), async (req, res) => {
     }
 });
 
-app.get('/getProfile', async (req, res) => {
-    try {
-    
-        const { studEmail } = req.query;
+app.get('/getProfile', verifyToken, async (req, res) => {
+  try {
+      const { studEmail } = req.query;
 
-        if (!studEmail) {
-            return res.status(400).json({ error: "Email is required" });
-        }
-        await client.connect();
-        const result = await stud.findOne({ studEmail });
+      if (!studEmail) {
+          return res.status(400).json({ error: "Email is required" });
+      }
 
-        if (!result) {
-            return res.status(404).json({ message: "Profile not found" });
-        }
+      await client.connect();
+      const result = await stud.findOne({ studEmail });
 
-        res.json({ profile: result });
-    } catch (err) {
-        console.error("Error fetching profile:", err);
-        res.status(500).json({ error: "Internal Server Error" });
-    } finally {
-        await client.close();
-    }
+      if (!result) {
+          return res.status(404).json({ message: "Profile not found" });
+      }
+
+      res.json({ profile: result });
+  } catch (err) {
+      console.error("Error fetching profile:", err);
+      res.status(500).json({ error: "Internal Server Error" });
+  } finally {
+      await client.close();
+  }
 });
 
-app.get('/getCourse', async (req, res) => {
+
+app.get('/getCourse',verifyToken, async (req, res) => {
     try {
         await client.connect();
         console.log("Enter the GetCourse");
@@ -516,66 +568,70 @@ app.post('/verifyOtp', async (req, res) => {
     }
 });
 
-app.post("/payment", async (req, res) => {
-    try {
-        await client.connect();
-        console.log("Entered the payment API");
+app.post("/payment", verifyToken, async (req, res) => {
+  try {
+    await client.connect();
+    console.log("Entered the payment API");
 
-        const { studEmail, stack, amountPaid, paymentType } = req.body;
-        console.log("Received data:", req.body);
+    const { studEmail, stack, amountPaid, paymentType } = req.body;
+    console.log("Received data:", req.body);
 
-        // Fetch the student document to get the current dueAmount
-        const student = await stud.findOne({ studEmail });
+    const student = await stud.findOne({ studEmail });
 
-        if (!student) {
-            return res.status(404).json({ message: "Student not found" });
-        }
-
-        // Find the course with the given stack
-        const course = student.courses.find(course => course.stack === stack);
-        if (!course) {
-            return res.status(404).json({ message: "Course not found" });
-        }
-
-        let dueAmount = course.payment.dueAmount || course.payment.coursePrice; // Default to full price if dueAmount not set
-        dueAmount -= amountPaid; // Calculate new due amount
-
-        let updateData = {
-            "courses.$.payment.paymentType": paymentType,
-            "courses.$.payment.paymentStatus": dueAmount === 0 ? "Paid" : "Partially Paid",
-            "courses.$.payment.dueAmount": dueAmount
-        };
-
-        // Update the payment details
-        const result = await stud.updateOne(
-            {
-                "studEmail": studEmail,
-                "courses.stack": stack
-            },
-            {
-                $set: updateData,
-                $push: {
-                    "courses.$.payment.paymentHistory": { amountPaid, date: new Date().toISOString().split("T")[0] }
-                }
-            }
-        );
-
-        if (result.modifiedCount > 0) {
-            console.log("Payment updated successfully");
-            res.status(200).json({ message: "Payment updated successfully" });
-        } else {
-            console.log("Payment update failed");
-            res.status(400).json({ message: "Payment update failed" });
-        }
-    } catch (error) {
-        console.log("Error in payment API", error);
-        res.status(500).json({ message: "Internal Server Error" });
-    } finally {
-        await client.close();
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
     }
+
+    const course = student.courses.find(course => course.stack === stack);
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    let dueAmount = course.payment.dueAmount || course.payment.coursePrice;
+    dueAmount -= amountPaid;
+
+    let updateData = {
+      "courses.$.payment.paymentType": paymentType,
+      "courses.$.payment.paymentStatus": dueAmount === 0 ? "Paid" : "Partially Paid",
+      "courses.$.payment.dueAmount": dueAmount
+    };
+
+    const transactionID = `REN-${Date.now()}`;
+
+    const result = await stud.updateOne(
+      {
+        "studEmail": studEmail,
+        "courses.stack": stack
+      },
+      {
+        $set: updateData,
+        $push: {
+          "courses.$.payment.paymentHistory": {
+            amountPaid,
+            date: new Date().toISOString().split("T")[0],
+            transactionID 
+          }
+      }}
+    );
+
+    if (result.modifiedCount > 0) {
+      console.log("Payment updated successfully with transaction ID:", transactionID);
+      res.status(200).json({ message: "Payment updated successfully", transactionID });
+    } else {
+      console.log("Payment update failed");
+      res.status(400).json({ message: "Payment update failed" });
+    }
+  } catch (error) {
+    console.log("Error in payment API", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  } finally {
+    await client.close();
+  }
 });
 
-app.get("/history", async (req, res) => {
+
+
+app.get("/history",verifyToken, async (req, res) => {
     try {
         await client.connect();
         console.log("Enter the history");
@@ -621,8 +677,8 @@ app.get("/history", async (req, res) => {
     }
 });
 
-// GET /filterSubjects
-app.get('/filterSubjects', async (req, res) => {
+
+app.get('/filterSubjects',verifyToken, async (req, res) => {
   const { studEmail, status } = req.query;
 
   try {
@@ -653,6 +709,51 @@ app.get('/filterSubjects', async (req, res) => {
     await client.close();
   }
 });
+
+app.get("/certificate", verifyToken, async (req, res) => {
+  try {
+    console.log("Entered the get-certificate API");
+
+    await client.connect();
+    const { studEmail } = req.query;
+
+    console.log("Received studEmail:", studEmail);
+
+    const student = await stud.findOne(
+      { studEmail: studEmail },
+      { projection: { courses: 1, _id: 0 } }
+    );
+
+    if (!student) {
+      console.log("Student not found");
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Get only completed courses
+    const completedCourses = student.courses.filter(
+      course => course.courseStatus === "Completed"
+    );
+console.log("Completed Courses:", completedCourses);
+
+    if (completedCourses.length > 0) {
+      console.log("Completed Courses:", completedCourses);
+      return res.status(200).json({ completedCourses });
+    } else {
+      return res.status(404).json({ message: "No completed courses available" });
+    }
+
+  } catch (error) {
+    console.error("Error in get-certificate API", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  } finally {
+    await client.close();
+  }
+});
+
+
+
+
+
 
 
   

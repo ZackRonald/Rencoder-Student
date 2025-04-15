@@ -47,7 +47,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./local/assets/notification_icon.png",
+          "icon": "./local/assets/Images/land.png",
           "color": "#ffffff",
           "defaultChannel": "default",
           "enableBackgroundRemoteNotifications": true

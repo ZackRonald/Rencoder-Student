@@ -10,23 +10,29 @@ import  Navi from "./Pages/Navigation";
 import PaymentBar from "./Components/PaymentBar";
 import Payment  from "./Pages/Payment"; 
 import PaymentHistory from "./Pages/PaymentHistory";
-import UpcomingPayment from "./Pages/UpcomingPayment";
+import Toast from 'react-native-toast-message';
+import Certificate from "./Pages/Certificate";
 const Stack = createStackNavigator();
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Login" component={Login} />
-        <Stack.Screen name="Home" component={ScrollBar} />
-        <Stack.Screen name="Profile" component={Profile} />
-        <Stack.Screen name="Navi" component={Navi} />
-        <Stack.Screen name="Course" component={Course} />
-        <Stack.Screen name="Upcoming" component={Upcoming} />
-        <Stack.Screen name="Payment" component={PaymentBar} />
-        <Stack.Screen name="PaymentHistory" component={PaymentHistory} />
-        <Stack.Screen name="UpcomingPayment" component={UpcomingPayment} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Login" component={Login} />
+          <Stack.Screen name="Home" component={ScrollBar} />
+          <Stack.Screen name="Profile" component={Profile} />
+          <Stack.Screen name="Certificate" component={Certificate} />
+          <Stack.Screen name="Navi" component={Navi} />
+          <Stack.Screen name="Course" component={Course} />
+          <Stack.Screen name="Upcoming" component={Upcoming} />
+          <Stack.Screen name="Payment" component={PaymentBar} />
+          <Stack.Screen name="PaymentHistory" component={PaymentHistory} />
+        </Stack.Navigator>
+      </NavigationContainer>
+
+      <Toast /> 
+    </>
   );
 }
+

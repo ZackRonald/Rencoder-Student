@@ -12,7 +12,7 @@ const Navbar = ({ navigation }) => {
   return (
     <View
       style={{
-        backgroundColor: "#9400D3",
+        backgroundColor: "white",
         padding: 15,
         flexDirection: "row",
         justifyContent: "space-between",
@@ -22,12 +22,12 @@ const Navbar = ({ navigation }) => {
       width:"100%"
       }}
     >
-      <Text style={{ color: "white", fontSize: 20, fontFamily: "Poppins-Medium" }}>
+      <Text style={{ color: "#8968CD", fontSize: 20, fontFamily: "Poppins-Medium" }}>
         Rencoder
       </Text>
 
       <TouchableOpacity onPress={() => navigation.navigate("Navi")}>  
-      <FontAwesome name="cog" size={30} color="white"/>
+      <FontAwesome name="cog" size={30} color="#8968CD"/>
       </TouchableOpacity>
     </View>
   );

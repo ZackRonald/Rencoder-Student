@@ -1,9 +1,17 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, ScrollView, StyleSheet, Dimensions } from "react-native";
+import React, { useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  Dimensions,
+  Modal,
+} from "react-native";
 import * as SecureStore from "expo-secure-store";
 import axios from "axios";
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "@react-navigation/native";
 import { Picker } from "@react-native-picker/picker";
+import Loader from "../Components/AnimatedLoader";
 
 const { width, height } = Dimensions.get("window");
 
@@ -19,10 +27,16 @@ export default function CourseDetails({ navigation }) {
 
       if (!token || !email) return;
 
-      const response = await axios.get("http://192.168.194.158:5000/filterSubjects", {
-        params: { studEmail: email, status: status === "All" ? undefined : status },
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(
+        "http://192.168.1.4:5000/filterSubjects",
+        {
+          params: {
+            studEmail: email,
+            status: status === "All" ? undefined : status,
+          },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       if (response.status === 200) {
         setSubjects(response.data);
@@ -39,17 +53,24 @@ export default function CourseDetails({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
+      setLoading(true); // Show loader every time screen is focused or filter changes
       fetchFilteredSubjects(filter);
     }, [filter])
   );
 
   return (
     <View style={styles.container}>
+      <Modal transparent={true} visible={loading} animationType="fade">
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Loader />
+        </View>
+      </Modal>
+
       <View style={styles.topBar}>
         <Text style={styles.head}>Course Details</Text>
       </View>
 
-      <ScrollView >
+      <ScrollView>
         <Picker
           selectedValue={filter}
           style={styles.picker}
@@ -61,9 +82,7 @@ export default function CourseDetails({ navigation }) {
           <Picker.Item label="Completed" value="Completed" />
         </Picker>
 
-        {loading ? (
-          <Text style={styles.loadingText}>Loading...</Text>
-        ) : subjects.length > 0 ? (
+        {subjects.length > 0 ? (
           subjects.map((subject, index) => (
             <View key={index} style={styles.subjectCard}>
               <Text style={styles.subHead}>{subject.stack}</Text>
@@ -103,7 +122,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topBar: {
-    backgroundColor: "#9400D3",
+    backgroundColor: "white",
     width: "100%",
     paddingVertical: height * 0.02,
     alignItems: "center",
@@ -111,7 +130,7 @@ const styles = StyleSheet.create({
   head: {
     fontSize: width * 0.08,
     fontWeight: "bold",
-    color: "white",
+    color: "#8968CD",
   },
   picker: {
     width: width * 0.45,

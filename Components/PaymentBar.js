@@ -3,7 +3,6 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
 import Payment from "../Pages/Payment";
 import PaymentHistory from "../Pages/PaymentHistory";
-import UpcomingPayment from "../Pages/UpcomingPayment";
 
 const Tab = createBottomTabNavigator();
 

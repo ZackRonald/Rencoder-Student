@@ -80,6 +80,7 @@ const styles = StyleSheet.create({
     height: 50,
     position: 'relative',
     justifyContent: 'center',
+    backgroundColor:"transparent",
   },
   loaderText: {
     position: 'absolute',
