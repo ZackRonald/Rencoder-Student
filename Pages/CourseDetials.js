@@ -70,7 +70,8 @@ export default function CourseDetails({ navigation }) {
         <Text style={styles.head}>Course Details</Text>
       </View>
 
-      <ScrollView>
+      <ScrollView showsVerticalScrollIndicator={false}  // Hides vertical scrollbar
+  showsHorizontalScrollIndicator={false} >
         <Picker
           selectedValue={filter}
           style={styles.picker}

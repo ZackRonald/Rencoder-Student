@@ -33,7 +33,6 @@ const db = client.db("Rencoder");
 const stud = db.collection("Student");
 app.use('/uploads', express.static('uploads'));
 
-// Middleware to verify JWT token
 function verifyToken(req, res, next) {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1]; // Expected format: "Bearer <token>"
@@ -137,6 +136,7 @@ app.post("/attendance", verifyToken, async (req, res) => {
 
     const today = new Date();
     const todayStr = today.toISOString().split("T")[0];
+console.log("Today Str",todayStr);
 
     // Step 1: Get last attendance date
     console.log("Entering Step 1");
@@ -180,12 +180,17 @@ console.log("Last Date:", lastDateStr);
           dateList.push(formatted);
         }
         nextDate.setDate(nextDate.getDate() + 1);
-        console.log("Date List",dateList);
       }
-      console.log("Date List",dateList);
+      
+      // Check if today is already included, and remove it
+      if (dateList.includes(todayStr)) {
+        dateList.pop(); // Remove today from the list
+      }
+      
+      console.log("Date List", dateList);
+      
       
     
-      // Loop through dateList using forEach and push if not in attendance
       dateList.forEach(formatted => {
         if (!attendance.some(entry => entry.date === formatted)) {
           newAttendances.push({
@@ -198,39 +203,22 @@ console.log("Last Date:", lastDateStr);
         }
       });
     
-      // Log Absent Dates
 
     }
 
 
-    // Step 3: Add today's Present record
-    const todayAttendance = attendance.find(a => a.date === todayStr);
-console.log("Today's Attendance:", todayAttendance);
+ 
 
-    if (!todayAttendance) {
+
+    
       newAttendances.push({
         date: todayStr,
         stack: stackName,
         subject: subjectName,
-        status: "Absent", // Mark Absent first
-        imagePath: null
-      });
-
-      newAttendances.push({
-        date: todayStr,
-        stack: stackName,
-        subject: subjectName,
-        status: "Present", // Mark Present after
+        status: "Present", // Mark as Present after
         imagePath: filepath
-      });
-    } else {
-      if (todayAttendance.status !== "Present") {
-        todayAttendance.status = "Present";
-        todayAttendance.imagePath = filepath;
-        newAttendances.push(todayAttendance);
-      }
-    }
-
+      })
+     
     // Step 4: Push to DB
     const updatedStudent = await stud.updateOne(
       {
@@ -318,7 +306,7 @@ app.post("/getAttendance", verifyToken, async (req, res) => {
 
     console.log("Today's Attendance:", todayAttendance);
 
-    // Send response only after checking for attendance
+     // Send response only after checking for attendance
     if (todayAttendance.length === 0) {
       return res.status(200).json({ message: "No attendance found for today." });
     }

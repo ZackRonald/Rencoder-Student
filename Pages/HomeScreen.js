@@ -410,7 +410,8 @@ if (loading) {
 
       <Navbar navigation={navigation} />
       
-<ScrollView>
+<ScrollView showsVerticalScrollIndicator={false}  // Hides vertical scrollbar
+  showsHorizontalScrollIndicator={false} >
       <View style={styles.card}>
         <Text style={styles.title}>Welcome to Rencoders</Text>
         <Text style={styles.description}>

@@ -6,12 +6,13 @@ import ScrollBar from "./Components/ScrollBar";
 import Profile from "./Pages/Profile";  
 import Course from "./Pages/CourseDetials";  
 import Upcoming from "./Pages/Upcoming";
-import  Navi from "./Pages/Navigation";
+import Navi from "./Pages/Navigation";
 import PaymentBar from "./Components/PaymentBar";
-import Payment  from "./Pages/Payment"; 
+import Payment from "./Pages/Payment"; 
 import PaymentHistory from "./Pages/PaymentHistory";
-import Toast from 'react-native-toast-message';
 import Certificate from "./Pages/Certificate";
+import Toast from 'react-native-toast-message';
+
 const Stack = createStackNavigator();
 
 export default function App() {
@@ -31,8 +32,17 @@ export default function App() {
         </Stack.Navigator>
       </NavigationContainer>
 
-      <Toast /> 
+      <Toast 
+  position="bottom" 
+  style={{ 
+    zIndex:9999, 
+    position: "absolute", 
+    bottom: 0, 
+    left: 0, 
+    right: 0,
+    marginBottom: 20
+  }}  
+/>
     </>
   );
 }
-

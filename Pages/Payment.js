@@ -179,7 +179,8 @@ function Payment() {
     );
   }
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}  // Hides vertical scrollbar
+    showsHorizontalScrollIndicator={false} >
       <View style={styles.topBar}>
         <TouchableOpacity
           style={styles.backButton}
