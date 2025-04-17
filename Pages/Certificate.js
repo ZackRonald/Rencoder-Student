@@ -71,7 +71,7 @@ export default function Certificate({ navigation }) {
 
       const fileUri = FileSystem.documentDirectory + 'certificate.jpg';
 
-      const downloadResumable = FileSystem.createDownloadResumable(
+      const downloadResumable = FileSystem.createDownloadResumable(///start the download
         selectedCertificate,
         fileUri
       );

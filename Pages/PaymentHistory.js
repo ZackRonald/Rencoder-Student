@@ -5,7 +5,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
 import Loader from "../Components/AnimatedLoader";
-
+import { useFonts } from 'expo-font';
 const { width, height } = Dimensions.get("window");
 
 const PaymentHistory = () => {
@@ -14,6 +14,14 @@ const PaymentHistory = () => {
   const navigation = useNavigation();
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedHistory, setSelectedHistory] = useState([]);
+  const [fontsLoaded] = useFonts({
+    'Poppins-Bold': require('../assets/Fonts/Poppins/Poppins-Bold.ttf'),
+    'Poppins-Medium': require('../assets/Fonts/Poppins/Poppins-Medium.ttf'),
+    'Quicksand-Regular':require("../assets/Fonts/Quicksand/static/Quicksand-Regular.ttf"),
+    'Quicksand-SemiBold':require("../assets/Fonts/Quicksand/static/Quicksand-SemiBold.ttf"),
+    'RobotoCondensed-Bold':require("../assets/Fonts/Roboto_Condensed/static/RobotoCondensed-Bold.ttf"),
+  });
+
 
   useFocusEffect(
     useCallback(() => {
@@ -66,6 +74,7 @@ const PaymentHistory = () => {
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Navi')}>
           <Ionicons name="arrow-back" size={28} color="#8968CD" />
+          
         </TouchableOpacity>
         <Text style={styles.topBarText}>History</Text>
       </View>
@@ -77,32 +86,50 @@ const PaymentHistory = () => {
           .filter(course => course.paymentHistory.length > 0)
           .map((course, index) => (
             <View key={index} style={styles.card}>
-              <Text style={styles.cardTitle}>{course.stack} - {course.courseID}</Text>
-              <Text style={styles.text}><Text style={styles.label}>Start Date:</Text> {course.startDate}</Text>
-              <Text style={styles.text}><Text style={styles.label}>Course Price:</Text> ₹{course.coursePrice}</Text>
-              <Text style={styles.text}><Text style={styles.label}>Payment Type:</Text> {course.paymentType}</Text>
-              <Text style={styles.text}>
-                <Text style={styles.label}>Due Amount:</Text>
-                <Text style={course.dueAmount === 0 ? styles.paid : styles.due}> ₹{course.dueAmount}</Text>
-              </Text>
-              <Text style={styles.text}>
-                <Text style={styles.label}>Status:</Text>
-                <Text style={course.paymentStatus === "Paid" ? styles.paid : styles.pending}>
-                  {course.paymentStatus}
-                </Text>
-              </Text>
 
-              <View style={styles.divider} />
-              <Text style={styles.subtitle}>Payment Transactions:</Text>
-              <TouchableOpacity onPress={() => openModal(course.paymentHistory)}>
-                <Text style={{ color: "#00FFFF", fontWeight: "600" }}>View All Transactions</Text>
-              </TouchableOpacity>
+              <View style={styles.top}>
+                <View style={styles.info}>
+                <Text style={styles.labelTop}>Course Price:</Text>
+              <Text style={styles.textTop}> ₹{course.coursePrice}</Text>
+
+                </View>
+              
+
+              <View style={styles.btn}>
+              <TouchableOpacity style={styles.button} onPress={() => openModal(course.paymentHistory)}>
+  <Text style={styles.buttonText}>History</Text>
+</TouchableOpacity>
+          </View>
+              </View>
+              <View style={styles.bottom}>
+                <View>
+                <Text style={styles.label}>Stack</Text>
+                <Text style={styles.text} >{course.stack}</Text>
+                </View>
+
+                <View>
+              <Text style={styles.label}>Course ID</Text>
+              <Text style={styles.text}>{course.courseID}</Text>
+              </View>
+
+              <View>
+                <Text style={styles.label}>Due Amount</Text>
+                <Text style={styles.text}>{course.dueAmount}</Text>
+              </View>
+              </View>
+             
+
+             
+             
+
+             
+              
             </View>
           ))
       )}
 
 <Modal visible={isModalVisible} transparent={true} animationType="slide">
-  <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.8)", padding: 20 }}>
+<View style={{ flex: 1, backgroundColor: "#8968CD", padding: 20 }}>
     <ScrollView>
       <TouchableOpacity onPress={() => setModalVisible(false)} style={{ alignSelf: 'flex-end' }}>
         <Ionicons name="close-circle" size={30} color="#fff" />
@@ -184,15 +211,45 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   text: {
-    fontSize: width * 0.035,
+    fontSize: width * 0.038,
     marginBottom: height * 0.008,
-    color: "#ddd",
+    color: "#fff",
     lineHeight: height * 0.025,
+   fontFamily:"Quicksand-SemiBold",
+   
   },
   label: {
-    fontWeight: "bold",
-    color: "#fff",
+    color: "#ddd",
+    fontSize: width * 0.04, 
     letterSpacing: 0.5,
+    fontFamily:"RobotoCondensed-Bold"
+  },
+  bottom: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    flexWrap: "wrap", 
+    rowGap: 10,
+    columnGap: 15,
+    marginTop: 10,
+  }
+  ,
+  top: {
+    flexDirection: "row",
+    justifyContent: "space-between", 
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  
+  labelTop:{
+    color:"#ddd",
+    fontSize:14,
+    fontFamily:"Poppins-Bold"
+  },
+  textTop:{
+    color:"#fff",
+    fontSize:30,
+    marginLeft:20,
+    fontFamily: 'Quicksand-Regular',
   },
   paid: {
     color: "#2ECC71",
@@ -259,28 +316,54 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   tableHeader: {
-    backgroundColor: '#333',
+    backgroundColor: '#7A5DC7', // slightly darker shade of theme
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderColor: '#555',
+    borderColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 5,
   },
+  
   tableHeaderText: {
     flex: 1,
     color: '#fff',
     fontWeight: 'bold',
     textAlign: 'center',
+    fontSize: 14,
   },
+  
   tableRow: {
     flexDirection: 'row',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderColor: '#444',
+    borderColor: '#D1C4E9',
+    backgroundColor: '#A68EDC', 
+    borderRadius: 6,
+    marginBottom: 5,
   },
+  
   tableCell: {
     flex: 1,
     color: '#fff',
     textAlign: 'center',
+    fontSize: 13,
   },
+  
+  button: {
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#8968CD',
+    fontWeight: '600',
+    fontSize: 13,
+    fontFamily:"Quicksand-SemiBold"
+  },
+ 
+
 });
 
 export default PaymentHistory;

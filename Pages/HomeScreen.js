@@ -6,7 +6,6 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as SecureStore from "expo-secure-store";
 import axios from "axios";
 import Icon from "react-native-vector-icons/Ionicons";
-import Font from 'react-native-vector-icons/FontAwesome5';
 import { Dimensions } from "react-native";
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect } from '@react-navigation/native';
@@ -194,6 +193,7 @@ useEffect(() => {
 
 useFocusEffect(
   useCallback(() => {
+    console.log("hii from")
     const requestNotifPermissions = async () => {
       const { status } = await Notifications.requestPermissionsAsync();
       if (status === "granted") {
@@ -397,10 +397,7 @@ if (loading) {
     <Loader />
  
   </View>
-</Modal>
-
-    
-    
+</Modal> 
     );
   }
 
@@ -434,7 +431,7 @@ if (loading) {
               if (!inProgressSubjects || inProgressSubjects.length === 0) return null;
 
               return (
-                <View key={index} style={{ marginBottom: 30 }}>
+                <View key={index} >
                   <Text style={styles.courseHeader}>{course.title}</Text>
                   {inProgressSubjects.map((subject, subIndex) => {
                     const uniqueKey = `${course.stack}-${subject.subject}`;
@@ -445,42 +442,58 @@ if (loading) {
 
                     return (
                       <View key={uniqueKey} style={styles.card2}>
-                        <Text style={styles.title}>{course.stack}</Text>
-                        <View style={styles.row}>
-                          <View style={styles.left}>
-                            <Text style={styles.label}>Subject</Text>
-                            <Text style={styles.value}>{subject.subject}</Text>
+  <View style={styles.top}>
+    <View>
+      <Text style={styles.TimeHead}>Class Starts in...</Text>
+      <Text style={styles.Time}>{subject.time}</Text>
+    </View>
 
-                            <Text style={styles.label}>Start Date</Text>
-                            <Text style={styles.value}>{subject.startDate}</Text>
+    <View>
+      {hasMarkedToday ? (
+        <Icon name="checkmark-circle" size={40} color="lightgreen" />
+      ) : (
+        <TouchableOpacity
+          onPress={() => openCameraModal(subject.subject, course.stack)}
+          style={styles.iconButton}
+        >
+          <Icon name="camera" size={30} color="#8968CD" />
+        </TouchableOpacity>
+      )}
+    </View>
+  </View>
 
-                            <Text style={styles.label}>Attendance</Text>
-                            <Text style={styles.value}>{subject.attendanceCount}</Text>
-                          </View>
+  <View style={styles.bottom}>
+    <View style={styles.bottomUpper}>
+      <View style={styles.infoSection}>
+        <Text style={styles.label}>Stack</Text>
+        <Text style={styles.value}>{course.stack}</Text>
+      </View>
 
-                          <View style={styles.right}>
-                            <Text style={styles.label}>Trainer Name</Text>
-                            <Text style={styles.value}>{subject.trainerName}</Text>
+      <View style={styles.infoSection}>
+        <Text style={styles.label}>Subject</Text>
+        <Text style={styles.value}>{subject.subject}</Text>
+      </View>
 
-                            <Text style={styles.label}>Time</Text>
-                            <Text style={styles.value}>{subject.time}</Text>
-                          </View>
-                        </View>
+      <View style={styles.infoSection}>
+        <Text style={styles.label}>Trainer Name</Text>
+        <Text style={styles.value}>{subject.trainerName}</Text>
+      </View>
+    </View>
 
-                        {hasMarkedToday ? (
-                          <Text style={{ color: "lightgreen", fontWeight: "bold", textAlign: "center", marginTop: 10 }}>
-                            ✅ Attendance already marked
-                          </Text>
-                        ) : (
-                          <TouchableOpacity
-                          onPress={() => openCameraModal(subject.subject, course.stack)}
-                          style={styles.iconButton}
-                        >
-                          <Icon name="camera" size={30} color="#fff" />
-                        </TouchableOpacity>
-                        
-                        )}
-                      </View>
+    <View style={styles.bottomLower}>
+      <View style={styles.infoSection}>
+        <Text style={styles.label}>Attendance</Text>
+        <Text style={styles.value}>{subject.attendanceCount}</Text>
+      </View>
+      <View style={styles.infoSection}>
+        <Text style={styles.label}>Batch Code</Text>
+        <Text style={styles.value}>{subject.batchCode}</Text>
+      </View>
+    </View>
+  </View>
+</View>
+
+
                     );
                   })}
                 </View>
@@ -561,17 +574,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.3)",
     padding: 20,
     borderRadius: 10,
-    
     margin: 20,
     position: "relative",
     top: 20,
     width: width * 0.9,
   },
-  card3: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: width,
-  },
+      
   scrollContainer: {
     flexGrow: 1,
     alignItems: "center",
@@ -579,20 +587,7 @@ const styles = StyleSheet.create({
  
     backgroundColor: "#8968CD",
   },
-  card2: {
-    width: width * 0.9,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
-    padding: 20,
-    borderRadius: 20,
-    shadowColor: "#00FFFF",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-    marginVertical: 15,
-    alignSelf: "center", 
-  },
+  
 
   description: {
     fontSize: 16,
@@ -620,16 +615,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 10,
   },
-  label: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#E6E6FA",
-  },
-  value: {
-    fontSize: 16,
-    color: "#FFFFFF",
-    marginBottom: 10,
-  },
+
   modalContainer: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.9)",
@@ -708,11 +694,77 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
 closeButton:{
-  
   fontWeight:"bold",
   position:"absolute",
   top: 20,
   left: 280,
-}});
+},
+top: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 20,
+},
+
+bottomLower: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+},
+Time: {
+  fontSize: 30,
+  fontWeight: "bold",
+},
+TimeHead: {
+  fontSize: 23,
+},
+card2: {
+  width: width * 0.9,
+  backgroundColor: "rgba(255, 255, 255, 0.12)",
+  padding: 20,
+  borderRadius: 20,
+  shadowColor: "#00FFFF",
+  shadowOffset: { width: 0, height: 5 },
+  shadowOpacity: 0.4,
+  shadowRadius: 15,
+  borderWidth: 1.5,
+  borderColor: "rgba(255, 255, 255, 0.3)",
+  marginBottom: 12, // <== try reducing this (5 might look too tight, 12-15 is comfy)
+  alignSelf: "center",
+},
+
+bottomUpper: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  flexWrap: "nowrap",
+},
+infoSection: {
+  flex: 1,         // take equal share of the row
+  minWidth: 0,     // allow flex-shrink to work
+  paddingHorizontal: 5,
+},
+label: {
+  fontSize: 14,
+  color: "#ccc",
+},
+value: {
+  fontSize: 16,
+  fontWeight: "bold",
+  color: "#fff",
+  flexShrink: 1,   // allow text to shrink
+},
+iconButton: {
+  backgroundColor: "#fff",
+  padding: 10,
+  borderRadius: 50,
+  alignItems: "center",
+  justifyContent: "center",
+},
+bottom:{
+  gap:10
+}
+
+});
 
 

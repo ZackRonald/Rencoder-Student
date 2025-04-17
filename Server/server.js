@@ -9,7 +9,7 @@ const fs = require('fs');
 const app = express();
 const speakeasy = require('speakeasy');
 const { cloneElement } = require("react");
-app.use(express.json({ limit: '10mb' })); // or higher
+app.use(express.json({ limit: '10mb' })); 
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 
@@ -35,7 +35,7 @@ app.use('/uploads', express.static('uploads'));
 
 function verifyToken(req, res, next) {
   const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1]; // Expected format: "Bearer <token>"
+  const token = authHeader && authHeader.split(" ")[1]; 
 
   if (!token) {
       return res.status(401).json({ message: "Access token is missing" });
@@ -43,8 +43,8 @@ function verifyToken(req, res, next) {
 
   try {
       const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded; // Attach decoded payload to request
-      next(); // Proceed to the route handler
+      req.user = decoded;
+      next();
   } catch (err) {
       return res.status(403).json({ message: "Invalid or expired token" });
   }
@@ -136,10 +136,8 @@ app.post("/attendance", verifyToken, async (req, res) => {
 
     const today = new Date();
     const todayStr = today.toISOString().split("T")[0];
-console.log("Today Str",todayStr);
 
-    // Step 1: Get last attendance date
-    console.log("Entering Step 1");
+    
     
     const studentDoc = await stud.findOne({
       studEmail: studEmail,
@@ -147,32 +145,25 @@ console.log("Today Str",todayStr);
       "courses.subjects.subject": subjectName
     });
 
-    const subjectData = studentDoc?.courses?.find(course => course.stack === stackName)
-      ?.subjects?.find(sub => sub.subject === subjectName);
-console.log("Subject Data:", subjectData);
+    const subjectData = studentDoc?.courses?.find(course => course.stack === stackName)?.subjects?.find(sub => sub.subject === subjectName);
 
     const attendance = subjectData?.attendance || [];
-console.log("Attendance Records:", attendance);
-const lastDate= attendance.map(a => a.date).sort();
-console.log("Last Date Array:", lastDate);
+
     let lastDateStr = attendance.map(a => a.date).sort().pop();
 console.log("Last Date:", lastDateStr);
 
     const newAttendances = [];
 
-    // Step 2: Backfill "Absent" dates for missed weekdays (excluding lastDate and today)
-    console.log("Entering Step 2");
     
     if (lastDateStr && lastDateStr !== todayStr) {
       let lastDate = new Date(lastDateStr);
       let nextDate = new Date(lastDate);
-      nextDate.setDate(lastDate.getDate() + 1); // Start from next day
+      nextDate.setDate(lastDate.getDate() + 1); //Start from next date
     
-      // Generate date list between lastDate and today
       const dateList = [];
       while (nextDate < today) {
-        const day = nextDate.getDay(); // 0 = Sunday, 6 = Saturday
-        if (day !== 0 && day !== 6) { // Weekdays only
+        const day = nextDate.getDay(); 
+        if (day !== 0 && day !== 6) { 
           const yyyy = nextDate.getFullYear();
           const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
           const dd = String(nextDate.getDate()).padStart(2, '0');
@@ -182,17 +173,12 @@ console.log("Last Date:", lastDateStr);
         nextDate.setDate(nextDate.getDate() + 1);
       }
       
-      // Check if today is already included, and remove it
       if (dateList.includes(todayStr)) {
-        dateList.pop(); // Remove today from the list
+        dateList.pop(); 
       }
-      
-      console.log("Date List", dateList);
-      
-      
-    
+
       dateList.forEach(formatted => {
-        if (!attendance.some(entry => entry.date === formatted)) {
+        if (!attendance.some(entry => entry.date === formatted)) {//Check the date is present on the DB
           newAttendances.push({
             date: formatted,
             stack: stackName,
@@ -202,24 +188,16 @@ console.log("Last Date:", lastDateStr);
           });
         }
       });
-    
-
     }
 
-
- 
-
-
-    
       newAttendances.push({
         date: todayStr,
         stack: stackName,
         subject: subjectName,
-        status: "Present", // Mark as Present after
+        status: "Present",
         imagePath: filepath
       })
      
-    // Step 4: Push to DB
     const updatedStudent = await stud.updateOne(
       {
         studEmail: studEmail,
@@ -239,7 +217,6 @@ console.log("Last Date:", lastDateStr);
       }
     );
 
-    // Step 5: Update attendanceCount for Present only
     const presentCount = newAttendances.filter(a => a.status === "Present").length;
 
     const result = await stud.updateOne(
@@ -306,7 +283,6 @@ app.post("/getAttendance", verifyToken, async (req, res) => {
 
     console.log("Today's Attendance:", todayAttendance);
 
-     // Send response only after checking for attendance
     if (todayAttendance.length === 0) {
       return res.status(200).json({ message: "No attendance found for today." });
     }
@@ -717,7 +693,6 @@ app.get("/certificate", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    // Get only completed courses
     const completedCourses = student.courses.filter(
       course => course.courseStatus === "Completed"
     );

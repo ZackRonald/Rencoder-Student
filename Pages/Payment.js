@@ -47,6 +47,7 @@ function Payment() {
   };
   const fetchCourses = async () => {
     try {
+      
       const studEmail = await SecureStore.getItemAsync("userEmail");
       const token = await SecureStore.getItemAsync("authToken");
   
@@ -100,7 +101,7 @@ function Payment() {
   
   const handlePayment = async () => {
     if (!selectedCourse) return;
-  
+    setLoading(true);
     try {
       const studEmail = await SecureStore.getItemAsync("userEmail");
       const token = await SecureStore.getItemAsync("authToken");
@@ -163,6 +164,9 @@ function Payment() {
         text1: 'Payment processing failed.',
       });
     }
+    finally{
+      setLoading(false);
+    }
   };
   
   if (loading) {
@@ -220,10 +224,10 @@ function Payment() {
                 </Text>
 
                 <TouchableOpacity
-                  style={styles.payButton}
+                  style={styles.payButton2}
                   onPress={() => openPaymentModal(course)}
                 >
-                  <Text style={styles.payButtonText}>Pay</Text>
+                  <Text style={styles.payButtonText2}>Pay</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -411,8 +415,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(0, 255, 255, 0.6)",
   },
+
+  payButton2: {
+    backgroundColor: "#FFFF",
+    paddingVertical: height * 0.015,
+    width: "60%",
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: height * 0.02,
+    shadowColor: "#00FFFF",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    borderWidth: 2,
+    borderColor: "#8968CD",
+  },
   payButtonText: {
     color: "#001F3F",
+    fontWeight: "bold",
+    fontSize: width * 0.045,
+  },
+  payButtonText2: {
+    color: "#8968CD",
     fontWeight: "bold",
     fontSize: width * 0.045,
   },
