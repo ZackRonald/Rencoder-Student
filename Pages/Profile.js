@@ -18,9 +18,8 @@ function Profile() {
   const [occp, setOccp] = useState("N/A");
   const [desgi, setDesgi] = useState("N/A");
   const [dob, setDob] = useState(null);
-  const [profileImage, setProfileImage] = useState(
-    require("../assets/Images/land.png")
-  );
+  const [profileImage, setProfileImage] = useState(require("../Server/uploads/profile.png"));
+  const [tempImage, setTempImage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -41,13 +40,15 @@ function Profile() {
       allowsEditing: true,
       quality: 1,
     });
-
+  
     if (!result.canceled) {
-      setProfileImage({ uri: result.assets[0].uri });
+      setTempImage({ uri: result.assets[0].uri });
+      console.log("tempImage",tempImage);
+      
     }
   };
-
-  const handleUpdate = async () => {
+  
+ const handleUpdate = async () => {
     setIsLoading(true);
     try {
       const email = await SecureStore.getItemAsync("userEmail");
@@ -71,18 +72,26 @@ function Profile() {
       formData.append("studDesignation", desgi);
       formData.append("studOccupation", occp);
   
-      if (profileImage && profileImage.uri) {
-        const fileExtension = profileImage.uri.split(".").pop();
+      console.log(formData);
+      
+      if (
+        tempImage &&
+        tempImage.uri !== "http://192.168.4.52:5000/uploads/profile.png"
+      ) {
+        setProfileImage(tempImage); // Set the selected image
+        const fileExtension = tempImage.uri.split(".").pop();
         const mimeType = `image/${fileExtension}`;
         formData.append("profileImage", {
-          uri: profileImage.uri,
+          uri: tempImage.uri,
           type: mimeType,
           name: `profile.${fileExtension}`,
         });
       }
+      
+     
   
       const response = await axios.post(
-        "http://192.168.1.4:5000/updateProfile",
+        "http://192.168.4.52:5000/updateProfile",
         formData,
         {
           headers: {
@@ -124,8 +133,6 @@ function Profile() {
       setIsLoading(false);
     }
   };
-  
-  
 
   const fetchProfile = async () => {
     setIsLoading(true);
@@ -139,7 +146,7 @@ function Profile() {
         return;
       }
   
-      const response = await axios.get("http://192.168.1.4:5000/getProfile",{
+      const response = await axios.get("http://192.168.4.52:5000/getProfile",{
         params: { studEmail: email },
         headers: {
           Authorization: `Bearer ${token}`,
@@ -178,8 +185,8 @@ function Profile() {
   
         setProfileImage({
           uri: studPic
-            ? `http://192.168.1.4:5000/${studPic}`
-            : `http://192.168.1.4:5000/uploads/profile.png`,
+            ? `http://192.168.4.52:5000/${studPic}`
+            : `http://192.168.4.52:5000/uploads/profile.png`,
         });
   
         const isAllDataPresent =
@@ -204,8 +211,17 @@ function Profile() {
   }, [refresh]);
 
   const handleOccupationChange = (itemValue) => {
-    setOccp(itemValue);
-    setisDesgiInpVisible(itemValue === "Employee");
+   
+    if(itemValue==="Employee"){
+      setOccp(itemValue);
+      setisDesgiInpVisible(true);
+      console.log(isDesgiInpVisible);
+    } 
+    else{
+      setOccp(itemValue);
+      setDesgi("");
+      setisDesgiInpVisible(false);
+    } 
   };
   if (isLoading) {
     return (
@@ -266,7 +282,7 @@ function Profile() {
               <Text style={styles.label}>Occupation</Text>
               <Text style={styles.value}>{occp || "N/A"}</Text>
             </View>
-            {isDeginVisible && (
+            {desgi!=="" && (
               <View style={styles.miniCard2}>
                 <Text style={styles.label}>Designation</Text>
                 <Text style={styles.value}>{desgi}</Text>
@@ -306,9 +322,16 @@ function Profile() {
 
       <Modal visible={isModalVisible} transparent={true} animationType="slide">
         <View style={styles.modalContainer}>
-          <TouchableOpacity onPress={selectImage} style={styles.imageContainer}>
-            <Image source={profileImage} style={styles.profileImage} />
-          </TouchableOpacity>
+        {profileImage?.uri === "http://192.168.4.52:5000/uploads/profile.png" && (
+  <TouchableOpacity onPress={selectImage} style={styles.imageContainer}>
+  <Image
+    source={tempImage ? tempImage : profileImage}
+    style={styles.profileImage}
+  />
+</TouchableOpacity>
+
+)}
+
 
           <TextInput
             placeholder="Degree"
@@ -337,7 +360,7 @@ function Profile() {
             </Picker>
           </View>
 
-          {isDesgiInpVisible && (
+          {occp==="Employee"&& (
             <TextInput
               placeholder="Designation"
               style={styles.input}
@@ -354,12 +377,21 @@ function Profile() {
           />
 
           <View style={styles.modalButtons}>
-            <Button title="Save" onPress={handleUpdate} />
-            <Button
-              title="Cancel"
-              onPress={() => setIsModalVisible(false)}
-              color="red"
-            />
+          <TouchableOpacity
+  style={styles.button}
+  onPress={() => setIsModalVisible(false)}
+>
+  <Text style={styles.buttonText}>Cancel</Text>
+</TouchableOpacity>
+
+<TouchableOpacity
+  style={[styles.button, styles.saveButton]}
+  onPress={handleUpdate}
+>
+  <Text style={styles.buttonText}>Save</Text>
+</TouchableOpacity>
+
+           
           </View>
         </View>
       </Modal>
@@ -453,7 +485,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "#8968CD", 
     padding: 20,
   },
   imageContainer: {
@@ -466,31 +498,64 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#FFFFFF",
     borderBottomWidth: 2,
-    borderBottomColor: "#FFD700",
+    borderBottomColor: "#FFFFFF", 
     marginBottom: 15,
+    backgroundColor: "transparent",
+    borderRadius: 0, 
   },
   textArea: {
     height: 80,
     borderBottomWidth: 2,
-    borderBottomColor: "#FFD700",
-    marginBottom: 15,
+    borderBottomColor: "#FFFFFF", // match input line style
     color: "#FFFFFF",
+    marginBottom: 15,
+    backgroundColor: "transparent",
+    padding: 8,
+    width:"100%"
   },
   pickerContainer: {
     width: "100%",
-    borderBottomWidth: 2,
-    borderBottomColor: "#FFD700",
+    borderWidth: 3,
+    borderColor:"#8968CD",
     marginVertical: 8,
+    backgroundColor: "#fff", // ensure no background
   },
   picker: {
-    color: "#FFFFFF",
+    color: "#8968CD",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    backgroundColor: "transparent", // consistent with inputs
   },
+  
   modalButtons: {
     marginTop: 20,
     flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
+    color:"#8968CD"
+  },  
+  button: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#8968CD",
+    marginHorizontal: 5,
   },
+  
+  saveButton: {
+    backgroundColor: "#FFFFFF",
+  },
+  
+  buttonText: {
+    color: "#8968CD",
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  
+
   backgroundImg: {
     width: "100%",
     height: height * 0.45,

@@ -33,7 +33,7 @@ export default function Certificate({ navigation }) {
       const token = await SecureStore.getItemAsync("authToken");
       const email = await SecureStore.getItemAsync("userEmail");
 
-      const response = await fetch(`http://192.168.1.4:5000/certificate?studEmail=${email}`, {
+      const response = await fetch(`http://192.168.4.52:5000/certificate?studEmail=${email}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

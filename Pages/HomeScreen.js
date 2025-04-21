@@ -1,5 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
-import { StatusBar, ScrollView, View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Modal } from "react-native";
+import {
+  StatusBar,
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+  Modal,
+} from "react-native";
 import Navbar from "../Components/UINavbar";
 import Loader from "../Components/AnimatedLoader";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -7,12 +16,12 @@ import * as SecureStore from "expo-secure-store";
 import axios from "axios";
 import Icon from "react-native-vector-icons/Ionicons";
 import { Dimensions } from "react-native";
-import * as Notifications from 'expo-notifications';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-import * as Location from 'expo-location';
-import { Linking } from 'react-native';
-import Toast from 'react-native-toast-message';
+import * as Notifications from "expo-notifications";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback } from "react";
+import * as Location from "expo-location";
+import { Linking } from "react-native";
+import Toast from "react-native-toast-message";
 
 const { width, height } = Dimensions.get("window");
 
@@ -29,375 +38,480 @@ export default function HomeScreen({ navigation }) {
   const cameraRef = useRef(null);
   const [todayAttendance, setTodayAttendance] = useState([]);
   const [showLocationModal, setShowLocationModal] = useState(false);
-const [activate, setActivate] = useState(false);
+  const [activate, setActivate] = useState(false);
+  const [cameraPermissionModal, setPermissionModal] = useState(false);
+  const [LocationPermissionModal, setLocationModal] = useState(false);
+  const [Time, setTime] = useState();
+  const setupNotifications = async (courses) => {
+    try {
+      const now = new Date();
+      const dayOfWeek = now.getDay(); // Sunday = 0, Monday = 6
+      if (dayOfWeek === 0 || dayOfWeek === 6) return; // Skip weekends
 
-const setupNotifications = async (courses) => {
-  try {
-    const now = new Date();
-    const dayOfWeek = now.getDay(); // Sunday = 0, Monday = 6
-    if (dayOfWeek === 0 || dayOfWeek === 6) return; // Skip weekends
+      // Cancel all previous notifications to prevent duplicates
+      await Notifications.cancelAllScheduledNotificationsAsync();
 
-    // Cancel all previous notifications to prevent duplicates
-    await Notifications.cancelAllScheduledNotificationsAsync();
+      // Loop through courses and subjects to find "In Progress" ones
+      courses.forEach((course) => {
+        course.subjects.forEach((subject) => {
+          if (subject.status === "In Progress") {
+            const [time, meridian] = subject.time.split(/(AM|PM)/i); // e.g., "2:00", "PM"
+            const [hoursStr, minutesStr] = time.split(":");
+            let hours = parseInt(hoursStr, 10);
+            const minutes = parseInt(minutesStr, 10);
 
-    // Loop through courses and subjects to find "In Progress" ones
-    courses.forEach(course => {
-      course.subjects.forEach(subject => {
-        if (subject.status === "In Progress") {
-          const [time, meridian] = subject.time.split(/(AM|PM)/i); // e.g., "2:00", "PM"
-          const [hoursStr, minutesStr] = time.split(":");
-          let hours = parseInt(hoursStr, 10);
-          const minutes = parseInt(minutesStr, 10);
+            // Convert to 24-hour format
+            if (meridian.toUpperCase() === "PM" && hours < 12) hours += 12;
+            if (meridian.toUpperCase() === "AM" && hours === 12) hours = 0;
 
-          // Convert to 24-hour format
-          if (meridian.toUpperCase() === "PM" && hours < 12) hours += 12;
-          if (meridian.toUpperCase() === "AM" && hours === 12) hours = 0;
+            const triggerDate = new Date();
+            triggerDate.setHours(hours);
+            triggerDate.setMinutes(minutes);
+            triggerDate.setSeconds(0);
+            console.log(triggerDate);
 
-          const triggerDate = new Date();
-          triggerDate.setHours(hours);
-          triggerDate.setMinutes(minutes);
-          triggerDate.setSeconds(0);
-console.log(triggerDate);
+            // Schedule only if the time is later than now
+            if (triggerDate > now) {
+              Notifications.scheduleNotificationAsync({
+                content: {
+                  title: `${subject.subject} Attendance`,
+                  body: `Class for ${subject.subject} is starting soon. Don't forget to mark attendance!`,
+                  data: { screen: "HomeScreen" },
+                },
+                trigger: triggerDate,
+              });
 
-          // Schedule only if the time is later than now
-          if (triggerDate > now) {
-            Notifications.scheduleNotificationAsync({
-              content: {
-                title: `📸 ${subject.subject} Attendance`,
-                body: `Class for ${subject.subject} is starting soon. Don't forget to mark attendance!`,
-                data: { screen: "HomeScreen" },
-              },
-              trigger: triggerDate,
-            });
-
-            console.log(`📅 Notification scheduled for ${subject.subject} at ${triggerDate}`);
+              console.log(
+                `Notification scheduled for ${subject.subject} at ${triggerDate}`
+              );
+            }
           }
-        }
+        });
       });
-    });
-  } catch (error) {
-    console.error("❌ Failed to schedule notifications:", error);
-  }
-};
+    } catch (error) {
+      console.error("Failed to schedule notifications:", error);
+    }
+  };
 
-const fetchTodayAttendance = async () => {
-  try {
-    const token = await SecureStore.getItemAsync("authToken");
-    const email = await SecureStore.getItemAsync("userEmail");
+  const fetchTodayAttendance = async () => {
+    try {
+      const token = await SecureStore.getItemAsync("authToken");
+      const email = await SecureStore.getItemAsync("userEmail");
 
-    if (!token || !email) {
-      const setupNotifications = async (courses) => {
-        try {
-          const now = new Date();
-          const dayOfWeek = now.getDay(); // Sunday = 0, Monday = 6
-          if (dayOfWeek === 0 || dayOfWeek === 6) return; // Skip weekends
-      
-          // Cancel all previous notifications to prevent duplicates
-          await Notifications.cancelAllScheduledNotificationsAsync();
-      
-          // Loop through courses and subjects to find "In Progress" ones
-          courses.forEach(course => {
-            course.subjects.forEach(subject => {
-              if (subject.status === "In Progress") {
-                const [time, meridian] = subject.time.split(/(AM|PM)/i); // e.g., "2:00", "PM"
-                const [hoursStr, minutesStr] = time.split(":");
-                let hours = parseInt(hoursStr, 10);
-                const minutes = parseInt(minutesStr, 10);
-      
-                // Convert to 24-hour format
-                if (meridian.toUpperCase() === "PM" && hours < 12) hours += 12;
-                if (meridian.toUpperCase() === "AM" && hours === 12) hours = 0;
-      
-                const triggerDate = new Date();
-                triggerDate.setHours(hours);
-                triggerDate.setMinutes(minutes);
-                triggerDate.setSeconds(0);
-                triggerDate.setMilliseconds(0);
-      
-                // Log trigger date for debugging
-                console.log(triggerDate);
-      
-                // Schedule only if the time is later than now
-                if (triggerDate > now) {
-                  Notifications.scheduleNotificationAsync({
-                    content: {
-                      title: `📸 ${subject.subject} Attendance`,
-                      body: `Class for ${subject.subject} is starting soon. Don't forget to mark attendance!And Your trainer is ${subject.trainerName} is waiting in the class`,
-                      data: { screen: "HomeScreen" },
-                    },
-                    trigger: {
-                      type: 'date',
-                      timestamp: triggerDate.getTime(),
-                    },
-                  });
-      
-                  console.log(`📅 Notification scheduled for ${subject.subject} at ${triggerDate}`);
+      if (!token || !email) {
+        const setupNotifications = async (courses) => {
+          try {
+            const now = new Date();
+            const dayOfWeek = now.getDay(); // Sunday = 0, Monday = 6
+            if (dayOfWeek === 0 || dayOfWeek === 6) return; // Skip weekends
+
+            // Cancel all previous notifications to prevent duplicates
+            await Notifications.cancelAllScheduledNotificationsAsync();
+
+            // Loop through courses and subjects to find "In Progress" ones
+            courses.forEach((course) => {
+              course.subjects.forEach((subject) => {
+                if (subject.status === "In Progress") {
+                  const [time, meridian] = subject.time.split(/(AM|PM)/i); // e.g., "2:00", "PM"
+                  const [hoursStr, minutesStr] = time.split(":");
+                  let hours = parseInt(hoursStr, 10);
+                  const minutes = parseInt(minutesStr, 10);
+
+                  // Convert to 24-hour format
+                  if (meridian.toUpperCase() === "PM" && hours < 12)
+                    hours += 12;
+                  if (meridian.toUpperCase() === "AM" && hours === 12)
+                    hours = 0;
+
+                  const triggerDate = new Date();
+                  triggerDate.setHours(hours);
+                  triggerDate.setMinutes(minutes);
+                  triggerDate.setSeconds(0);
+                  triggerDate.setMilliseconds(0);
+
+                  // Log trigger date for debugging
+                  console.log(triggerDate);
+
+                  // Schedule only if the time is later than now
+                  if (triggerDate > now) {
+                    Notifications.scheduleNotificationAsync({
+                      content: {
+                        title: `${subject.subject} Attendance`,
+                        body: `Class for ${subject.subject} is starting soon. Don't forget to mark attendance!And Your trainer is ${subject.trainerName} is waiting in the class`,
+                        data: { screen: "HomeScreen" },
+                      },
+                      trigger: {
+                        type: "date",
+                        timestamp: triggerDate.getTime(),
+                      },
+                    });
+
+                    console.log(
+                      `Notification scheduled for ${subject.subject} at ${triggerDate}`
+                    );
+                  }
                 }
-              }
+              });
             });
-          });
-        } catch (error) {
-          console.error("❌ Failed to schedule notifications:", error);
+          } catch (error) {
+            console.error("Failed to schedule notifications:", error);
+          }
+        };
+        setLoading(false);
+        return;
+      }
+
+      const response = await axios.post(
+        "http://192.168.4.52:5000/getAttendance",
+        { studEmail: email },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.status === 200 && Array.isArray(response.data.attendance)) {
+        setTodayAttendance(response.data.attendance);
+      } else {
+        setTodayAttendance([]);
+      }
+      console.log("Notifiacton");
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Error Fetching Attendance",
+        text2: error?.response?.data || error?.message,
+      });
+      setTodayAttendance([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openCameraModal = async (subject, stack) => {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    console.log(status);
+    if (status === "undetermined" || status === "denied") {
+      console.log("Entering Again for status change");
+      setShowLocationModal(true);
+
+      const { status: newStatus } =
+        await Location.requestForegroundPermissionsAsync();
+      status = newStatus;
+    }
+    console.log(status);
+
+    if (status !== "granted") {
+      console.log("No Permission Granted");
+
+      setShowLocationModal(true);
+      return;
+    }
+    console.log("Permission Granted");
+
+    setActivate(!activate);
+    checkLocationAndOpenCamera(subject, stack);
+  };
+
+  useEffect(() => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log("hii from");
+      const requestNotifPermissions = async () => {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status === "granted") {
+          setNotificationPermission(status);
+        } else {
+          setLocationModal(true);
         }
       };
-      setLoading(false);
-      return;
-    }
 
-    const response = await axios.post(
-      "http://192.168.1.4:5000/getAttendance",
-      { studEmail: email },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+      const initialize = async () => {
+        setLoading(true);
+        try {
+          await requestNotifPermissions();
+          const fetchedCourses = await fetchCourses();
+          await fetchTodayAttendance();
+          await setupNotifications(fetchedCourses);
+        } catch (error) {
+          Toast.show({
+            type: "error",
+            text1: "Initialization Failed",
+            text2: error.message,
+          });
+        } finally {
+          setLoading(false);
+        }
+      };
 
-    if (response.status === 200 && Array.isArray(response.data.attendance)) {
-      setTodayAttendance(response.data.attendance);
-    } else {
-      setTodayAttendance([]);
-    }
-    console.log("Notifiacton"); 
-    
-  } catch (error) {
-    Toast.show({
-      type: 'error',
-      text1: 'Error Fetching Attendance',
-      text2: error?.response?.data || error?.message,
-    });
-    setTodayAttendance([]);
-  } finally {
-    setLoading(false);
-  }
-};
+      initialize();
+    }, [])
+  );
 
-const openCameraModal = async (subject, stack) => {
-  const { status } = await Location.getForegroundPermissionsAsync();
+  const closeCameraModal = () => setCameraModalVisible(false);
 
-  if (status !== "granted") {
-    setShowLocationModal(true);
-    return;
-  }
+  const fetchCourses = async () => {
+    try {
+      const token = await SecureStore.getItemAsync("authToken");
+      const email = await SecureStore.getItemAsync("userEmail");
 
-  setActivate(!activate);
-  checkLocationAndOpenCamera(subject, stack);
-};
+      if (!token || !email) {
+        Toast.show({
+          type: "error",
+          text1: "Auth Error",
+          text2: "Missing token or email",
+        });
+        setLoading(false);
+        return [];
+      }
 
-useEffect(() => {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
-}, []);
+      const response = await axios.get("http://192.168.4.52:5000/getCourse", {
+        params: { studEmail: email },
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-useFocusEffect(
-  useCallback(() => {
-    console.log("hii from")
-    const requestNotifPermissions = async () => {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status === "granted") {
-        setNotificationPermission(status);
+      const { courses = [], targetLat, targetLog } = response.data;
+
+      if (targetLat && targetLog) {
+        await SecureStore.setItemAsync("targetLat", targetLat.toString());
+        await SecureStore.setItemAsync("targetLog", targetLog.toString());
       } else {
         Toast.show({
-          type: 'info',
-          text1: 'Notifications',
-          text2: 'Permission denied',
+          type: "info",
+          text1: "Missing Target Coordinates",
         });
       }
-    };
 
-    const initialize = async () => {
-      setLoading(true);
-      try {
-        await requestNotifPermissions();
-        const fetchedCourses = await fetchCourses();
-        await fetchTodayAttendance();
-        await setupNotifications(fetchedCourses);
-      } catch (error) {
-        Toast.show({
-          type: 'error',
-          text1: 'Initialization Failed',
-          text2: error.message,
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initialize();
-  }, [])
-);
-
-const closeCameraModal = () => setCameraModalVisible(false);
-
-const fetchCourses = async () => {
-  try {
-    const token = await SecureStore.getItemAsync("authToken");
-    const email = await SecureStore.getItemAsync("userEmail");
-
-    if (!token || !email) {
+      setCourses(courses);
+      return courses;
+    } catch (error) {
       Toast.show({
-        type: 'error',
-        text1: 'Auth Error',
-        text2: 'Missing token or email',
+        type: "error",
+        text1: "Course Fetch Failed",
+        text2: error?.response?.data || error.message,
       });
-      setLoading(false);
       return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const takePicture = async () => {
+    if (!cameraRef.current) return;
+
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ base64: true });
+      const token = await SecureStore.getItemAsync("authToken");
+      const studEmail = await SecureStore.getItemAsync("userEmail");
+      if (!token) {
+        Toast.show({
+          type: "error",
+          text1: "Auth Error",
+          text2: "Authentication token missing.",
+        });
+        return;
+      }
+
+      const payload = {
+        studEmail: studEmail,
+        image: photo.base64,
+        subjectName: currentSubjectName,
+        stackName: currentStackName,
+      };
+
+      const response = await axios.post(
+        "http://192.168.4.52:5000/attendance",
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      Toast.show({
+        type: "success",
+        text1: "Attendance Marked",
+        text2: response.data.message || "Success",
+      });
+
+      closeCameraModal();
+      fetchTodayAttendance();
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Attendance Failed",
+        text2: error.response?.data || error.message,
+      });
+    }
+  };
+
+  const cameraPermission = async (subject) => {
+    if (permission?.status !== "granted") {
+      const perm = await requestPermission();
+      if (perm.status !== "granted") {
+        setPermissionModal(true);
+        console.log("Permission not granted");
+        return;
+      }
     }
 
-    const response = await axios.get("http://192.168.1.4:5000/getCourse", {
-      params: { studEmail: email },
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    console.log("Camera permission granted");
+    await Times(subject);
+  };
 
-    const { courses = [], targetLat, targetLog } = response.data;
+  const Times = async (subject) => {
+    try {
+      const token = await SecureStore.getItemAsync("authToken");
+      const email = await SecureStore.getItemAsync("userEmail");
 
-    if (targetLat && targetLog) {
-      await SecureStore.setItemAsync("targetLat", targetLat.toString());
-      await SecureStore.setItemAsync("targetLog", targetLog.toString());
+      const response = await axios.post(
+        "http://192.168.4.52:5000/time",
+        { email },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const timeData = response.data;
+      setTime(timeData);
+
+      Timer(subject, timeData);
+    } catch (error) {
+      console.log("Error fetching times:", error);
+    }
+  };
+
+  const Timer = (subject) => {
+    console.log("Entered the Timer");
+
+    const now = new Date();
+
+    const foundSubject = Time.Timers.find((item) => item.subject === subject);
+
+    if (foundSubject) {
+      const startTimeStr = foundSubject.time;
+      console.log("Start time string:", startTimeStr);
+
+      const match = startTimeStr.match(/(\d{1,2}:\d{2})\s*(AM|PM)/i);
+
+      if (!match) {
+        console.log("Invalid time format:", startTimeStr);
+        return;
+      }
+
+      const [_, timePart, period] = match;
+      let [hours, minutes] = timePart.split(":").map(Number);
+
+      if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
+      if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
+
+      const startTime = new Date();
+      startTime.setHours(hours);
+      startTime.setMinutes(minutes);
+      startTime.setSeconds(0);
+
+      const endTime = new Date(startTime.getTime() + 15 * 60000);
+      console.log("End Time", endTime);
+
+      if (now >= startTime && now <= endTime) {
+        setCameraModalVisible(true);
+      } else {
+        Toast.show({
+          type: "info",
+          text1: "Time Out",
+          text2: "Please mark your attendance on time.",
+        });
+      }
     } else {
-      Toast.show({
-        type: 'info',
-        text1: 'Missing Target Coordinates',
-      });
+      console.log("Subject not found");
     }
+  };
 
-    setCourses(courses);
-    return courses;
-  } catch (error) {
-    Toast.show({
-      type: 'error',
-      text1: 'Course Fetch Failed',
-      text2: error?.response?.data || error.message,
-    });
-    return [];
-  } finally {
-    setLoading(false);
-  }
-};
+  const checkLocationAndOpenCamera = async (subject, stack) => {
+    try {
+      setLoading(true);
+      const loc = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = loc.coords;
 
-const takePicture = async () => {
-  if (!cameraRef.current) return;
+      const latStr = await SecureStore.getItemAsync("targetLat");
+      const logStr = await SecureStore.getItemAsync("targetLog");
 
-  try {
-    const photo = await cameraRef.current.takePictureAsync({ base64: true });
-    const token = await SecureStore.getItemAsync("authToken");
-const studEmail = await SecureStore.getItemAsync("userEmail");
-    if (!token) {
+      const targetLat = parseFloat(latStr);
+      const targetLog = parseFloat(logStr);
+
+      if (!targetLat || !targetLog) {
+        Toast.show({
+          type: "error",
+          text1: "Target Not Set",
+          text2: "Target location is missing.",
+        });
+        return;
+      }
+
+      const distance = getDistanceFromLatLonInMeters(
+        latitude,
+        longitude,
+        targetLat,
+        targetLog
+      );
+
+      if (distance <= 100) {
+        setCurrentSubjectName(subject);
+        setCurrentStackName(stack);
+        cameraPermission(subject);
+      } else {
+        Toast.show({
+          type: "error",
+          text1: "Out of Range",
+          text2: "Move closer to the target location.",
+        });
+      }
+    } catch (error) {
       Toast.show({
-        type: 'error',
-        text1: 'Auth Error',
-        text2: 'Authentication token missing.',
+        type: "error",
+        text1: "Location Error",
+        text2: "Could not get your current location.",
       });
-      return;
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const payload = {
-      studEmail: studEmail,
-      image: photo.base64,
-      subjectName: currentSubjectName,
-      stackName: currentStackName,
-    };
+  const getDistanceFromLatLonInMeters = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3;
+    const toRad = (value) => (value * Math.PI) / 180;
 
-    const response = await axios.post("http://192.168.1.4:5000/attendance", payload, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
 
-    Toast.show({
-      type: 'success',
-      text1: 'Attendance Marked',
-      text2: response.data.message || 'Success',
-    });
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
 
-    closeCameraModal();
-    fetchTodayAttendance();
-  } catch (error) {
-    Toast.show({
-      type: 'error',
-      text1: 'Attendance Failed',
-      text2: error.response?.data || error.message,
-    });
-  }
-};
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
 
-const checkLocationAndOpenCamera = async (subject, stack) => {
-  try {
-    setLoading(true);
-    const loc = await Location.getCurrentPositionAsync({});
-    const { latitude, longitude } = loc.coords;
-
-    const latStr = await SecureStore.getItemAsync("targetLat");
-    const logStr = await SecureStore.getItemAsync("targetLog");
-
-    const targetLat = parseFloat(latStr);
-    const targetLog = parseFloat(logStr);
-
-    if (!targetLat || !targetLog) {
-      Toast.show({
-        type: 'error',
-        text1: 'Target Not Set',
-        text2: 'Target location is missing.',
-      });
-      return;
-    }
-
-    const distance = getDistanceFromLatLonInMeters(latitude, longitude, targetLat, targetLog);
-
-    if (distance <= 100) {
-      setCurrentSubjectName(subject);
-      setCurrentStackName(stack);
-      setCameraModalVisible(true);
-    } else {
-      Toast.show({
-        type: 'error',
-        text1: 'Out of Range',
-        text2: 'Move closer to the target location.',
-      });
-    }
-  } catch (error) {
-    Toast.show({
-      type: 'error',
-      text1: 'Location Error',
-      text2: 'Could not get your current location.',
-    });
-  } finally {
-    setLoading(false);
-  }
-};
-
-const getDistanceFromLatLonInMeters = (lat1, lon1, lat2, lon2) => {
-  const R = 6371e3;
-  const toRad = (value) => (value * Math.PI) / 180;
-
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
-
-if (loading) {
+  if (loading) {
     return (
-      <Modal
-  transparent={true}
-  visible={loading}
-  animationType="fade"
->
-
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Loader />
- 
-  </View>
-</Modal> 
+      <Modal transparent={true} visible={loading} animationType="fade">
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <Loader />
+        </View>
+      </Modal>
     );
   }
 
@@ -406,159 +520,272 @@ if (loading) {
       <StatusBar backgroundColor="#4B0082" barStyle="light-content" />
 
       <Navbar navigation={navigation} />
-      
-<ScrollView showsVerticalScrollIndicator={false}  // Hides vertical scrollbar
-  showsHorizontalScrollIndicator={false} >
-      <View style={styles.card}>
-        <Text style={styles.title}>Welcome to Rencoders</Text>
-        <Text style={styles.description}>
-          "Every great coder was once a beginner who never gave up!"{"\n\n"}
-          Your coding journey starts here! Track progress, stay on top of courses, and never miss a class.{"\n\n"}
-          Stay consistent. Keep learning.{"\n"}Build your future.
-        </Text>
-      </View>
 
-      <View style={styles.card3}>
-        {loading ? (
-          <ActivityIndicator size="large" color="#8968CD" />
-        ) : (
-          <View style={{ width: "100%" }}>
-            {courses.map((course, index) => {
-              const inProgressSubjects = course.subjects?.filter(
-                (subject) => subject.status === "In Progress"
-              );
+      <ScrollView
+        showsVerticalScrollIndicator={false} // Hides vertical scrollbar
+        showsHorizontalScrollIndicator={false}
+      >
+        <View style={styles.card}>
+          <Text style={styles.title}>Welcome to Rencoders</Text>
+          <Text style={styles.description}>
+            "Every great coder was once a beginner who never gave up!"{"\n\n"}
+            Your coding journey starts here! Track progress, stay on top of
+            courses, and never miss a class.{"\n\n"}
+            Stay consistent. Keep learning.{"\n"}Build your future.
+          </Text>
+        </View>
 
-              if (!inProgressSubjects || inProgressSubjects.length === 0) return null;
+        <View style={styles.card3}>
+          {loading ? (
+            <ActivityIndicator size="large" color="#8968CD" />
+          ) : (
+            <View style={{ width: "100%" }}>
+              {courses.map((course, index) => {
+                const inProgressSubjects = course.subjects?.filter(
+                  (subject) => subject.status === "In Progress"
+                );
 
-              return (
-                <View key={index} >
-                  <Text style={styles.courseHeader}>{course.title}</Text>
-                  {inProgressSubjects.map((subject, subIndex) => {
-                    const uniqueKey = `${course.stack}-${subject.subject}`;
-                    const hasMarkedToday = todayAttendance.some(
-                      (entry) =>
-                        entry.subject === subject.subject && entry.stack === course.stack
-                    );
+                if (!inProgressSubjects || inProgressSubjects.length === 0)
+                  return null;
 
-                    return (
-                      <View key={uniqueKey} style={styles.card2}>
-  <View style={styles.top}>
-    <View>
-      <Text style={styles.TimeHead}>Class Starts in...</Text>
-      <Text style={styles.Time}>{subject.time}</Text>
-    </View>
+                return (
+                  <View key={index}>
+                    <Text style={styles.courseHeader}>{course.title}</Text>
+                    {inProgressSubjects.map((subject, subIndex) => {
+                      const uniqueKey = `${course.stack}-${subject.subject}`;
+                      const hasMarkedToday = todayAttendance.some(
+                        (entry) =>
+                          entry.subject === subject.subject &&
+                          entry.stack === course.stack
+                      );
 
-    <View>
-      {hasMarkedToday ? (
-        <Icon name="checkmark-circle" size={40} color="lightgreen" />
-      ) : (
-        <TouchableOpacity
-          onPress={() => openCameraModal(subject.subject, course.stack)}
-          style={styles.iconButton}
-        >
-          <Icon name="camera" size={30} color="#8968CD" />
-        </TouchableOpacity>
-      )}
-    </View>
-  </View>
+                      return (
+                        <View key={uniqueKey} style={styles.card2}>
+                          <View style={styles.top}>
+                            <View>
+                              <Text style={styles.TimeHead}>
+                                Class Starts in...
+                              </Text>
+                              <Text style={styles.Time}>{subject.time}</Text>
+                            </View>
 
-  <View style={styles.bottom}>
-    <View style={styles.bottomUpper}>
-      <View style={styles.infoSection}>
-        <Text style={styles.label}>Stack</Text>
-        <Text style={styles.value}>{course.stack}</Text>
-      </View>
+                            <View>
+                              {hasMarkedToday ? (
+                                <Icon
+                                  name="checkmark-circle"
+                                  size={40}
+                                  color="lightgreen"
+                                />
+                              ) : (
+                                <TouchableOpacity
+                                  onPress={() =>
+                                    openCameraModal(
+                                      subject.subject,
+                                      course.stack
+                                    )
+                                  }
+                                  style={styles.iconButton}
+                                >
+                                  <Icon
+                                    name="camera"
+                                    size={30}
+                                    color="#8968CD"
+                                  />
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </View>
 
-      <View style={styles.infoSection}>
-        <Text style={styles.label}>Subject</Text>
-        <Text style={styles.value}>{subject.subject}</Text>
-      </View>
+                          <View style={styles.bottom}>
+                            <View style={styles.bottomUpper}>
+                              <View style={styles.infoSection}>
+                                <Text style={styles.label}>Stack</Text>
+                                <Text style={styles.value}>{course.stack}</Text>
+                              </View>
 
-      <View style={styles.infoSection}>
-        <Text style={styles.label}>Trainer Name</Text>
-        <Text style={styles.value}>{subject.trainerName}</Text>
-      </View>
-    </View>
+                              <View style={styles.infoSection}>
+                                <Text style={styles.label}>Subject</Text>
+                                <Text style={styles.value}>
+                                  {subject.subject}
+                                </Text>
+                              </View>
 
-    <View style={styles.bottomLower}>
-      <View style={styles.infoSection}>
-        <Text style={styles.label}>Attendance</Text>
-        <Text style={styles.value}>{subject.attendanceCount}</Text>
-      </View>
-      <View style={styles.infoSection}>
-        <Text style={styles.label}>Batch Code</Text>
-        <Text style={styles.value}>{subject.batchCode}</Text>
-      </View>
-    </View>
-  </View>
-</View>
+                              <View style={styles.infoSection}>
+                                <Text style={styles.label}>Trainer Name</Text>
+                                <Text style={styles.value}>
+                                  {subject.trainerName}
+                                </Text>
+                              </View>
+                            </View>
 
-
-                    );
-                  })}
-                </View>
-              );
-            })}
-          </View>
-        )}
-        
-      </View>
+                            <View style={styles.bottomLower}>
+                              <View style={styles.infoSection}>
+                                <Text style={styles.label}>Attendance</Text>
+                                <Text style={styles.value}>
+                                  {subject.attendanceCount}
+                                </Text>
+                              </View>
+                              <View style={styles.infoSection}>
+                                <Text style={styles.label}>Batch Code</Text>
+                                <Text style={styles.value}>
+                                  {subject.batchCode}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
       </ScrollView>
 
-<Modal visible={isCameraModalVisible} animationType="slide" transparent={true}>
+      <Modal
+        visible={isCameraModalVisible}
+        animationType="slide"
+        transparent={true}
+      >
         <View style={styles.modalContainer}>
-          <TouchableOpacity style={styles.closeButton} onPress={closeCameraModal}>
-          <Icon name="close" size={60} color="#fff" />
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={closeCameraModal}
+          >
+            <Icon name="close" size={60} color="#fff" />
           </TouchableOpacity>
           <View style={styles.cameraWrapper}>
             <CameraView ref={cameraRef} style={{ flex: 1 }} facing={facing}>
               <View style={styles.buttonContainer}>
-              
-              
-                <TouchableOpacity style={styles.shutterButton} onPress={takePicture}>
-  <View style={styles.shutterOuter}>
-    <View style={styles.shutterInner} />
-  </View>
-</TouchableOpacity>
-
-
+                <TouchableOpacity
+                  style={styles.shutterButton}
+                  onPress={takePicture}
+                >
+                  <View style={styles.shutterOuter}>
+                    <View style={styles.shutterInner} />
+                  </View>
+                </TouchableOpacity>
               </View>
             </CameraView>
           </View>
         </View>
       </Modal>
 
-
       <Modal visible={showLocationModal} transparent animationType="fade">
-  <View style={styles.modalContainer}>
-    <View style={styles.permissionModal}>
-      <Text style={styles.modalTitle}>📍Location Required</Text>
-      <Text style={styles.modalText}>
-        This app needs location permission to mark your attendance. Please enable it in app settings.
-      </Text>
-      <View style={{ flexDirection: "row", justifyContent: "space-around", marginTop: 20 }}>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => {
-            setShowLocationModal(false);
-          }}
-        >
-          <Text style={styles.text}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => {
-            setShowLocationModal(false);
-            Linking.openSettings();
-          }}
-        >
-          <Text style={styles.text}>Go to Settings</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-</Modal>
+        <View style={styles.modalContainer}>
+          <View style={styles.permissionModal}>
+            <Text style={styles.modalTitle}>Location Required</Text>
+            <Text style={styles.modalText}>
+              This app needs location permission to mark your attendance. Please
+              enable it in app settings.
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                gap: 20,
+                marginTop: 20,
+              }}
+            >
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => {
+                  setShowLocationModal(false);
+                }}
+              >
+                <Text style={styles.text}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => {
+                  setShowLocationModal(false);
+                  Linking.openSettings();
+                }}
+              >
+                <Text style={styles.text}>Go to Settings</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
+      <Modal visible={cameraPermissionModal} transparent animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.permissionModal}>
+            <Text style={styles.modalTitle}>Camera Required</Text>
+            <Text style={styles.modalText}>
+              This app needs camera permission to mark your attendance. Please
+              enable it in app settings.
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                gap: 20,
+                marginTop: 20,
+              }}
+            >
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => {
+                  setPermissionModal(false);
+                }}
+              >
+                <Text style={styles.text}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => {
+                  setPermissionModal(false);
+                  Linking.openSettings();
+                }}
+              >
+                <Text style={styles.text}>Go to Settings</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={LocationPermissionModal} transparent animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.permissionModal}>
+            <Text style={styles.modalTitle}>Notifiacton Required</Text>
+            <Text style={styles.modalText}>
+              This app needs Notifiacton permission to notify you to mark your
+              attendance. Please enable it in app settings.
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                gap: 20,
+                marginTop: 20,
+              }}
+            >
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => {
+                  setLocationModal(false);
+                }}
+              >
+                <Text style={styles.text}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => {
+                  setLocationModal(false);
+                  Linking.openSettings();
+                }}
+              >
+                <Text style={styles.text}>Go to Settings</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -576,18 +803,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     margin: 20,
     position: "relative",
-    top: 20,
     width: width * 0.9,
+    marginBottom:30
   },
-      
+
   scrollContainer: {
     flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
- 
     backgroundColor: "#8968CD",
   },
-  
 
   description: {
     fontSize: 16,
@@ -635,7 +860,7 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: "row",
     justifyContent: "space-around",
-   
+
     paddingVertical: 10,
   },
   button: {
@@ -672,99 +897,99 @@ const styles = StyleSheet.create({
     color: "#333",
     textAlign: "center",
   },
-  
+
   shutterButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 20,
   },
   shutterOuter: {
-    width: width*0.2,
-    height: height*0.1,
+    width: width * 0.2,
+    height: height * 0.1,
     borderRadius: 35,
     borderWidth: 5,
-    borderColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
   },
   shutterInner: {
-    width: width*0.15,
-    height: height*0.07,
+    width: width * 0.15,
+    height: height * 0.07,
     borderRadius: 25,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
-closeButton:{
-  fontWeight:"bold",
-  position:"absolute",
-  top: 20,
-  left: 280,
-},
-top: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: 20,
-},
+  closeButton: {
+    fontWeight: "bold",
+    position: "absolute",
+    top: 20,
+    left: 280,
+  },
+  top: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
 
-bottomLower: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-},
-Time: {
-  fontSize: 30,
-  fontWeight: "bold",
-},
-TimeHead: {
-  fontSize: 23,
-},
-card2: {
-  width: width * 0.9,
-  backgroundColor: "rgba(255, 255, 255, 0.12)",
-  padding: 20,
-  borderRadius: 20,
-  shadowColor: "#00FFFF",
-  shadowOffset: { width: 0, height: 5 },
-  shadowOpacity: 0.4,
-  shadowRadius: 15,
-  borderWidth: 1.5,
-  borderColor: "rgba(255, 255, 255, 0.3)",
-  marginBottom: 12, // <== try reducing this (5 might look too tight, 12-15 is comfy)
-  alignSelf: "center",
-},
+  bottomLower: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  Time: {
+    fontSize: 30,
+    fontWeight: "bold",
+  },
+  TimeHead: {
+    fontSize: 23,
+  },
+  card2: {
+    width: width * 0.9,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    padding: 20,
+    borderRadius: 20,
+    shadowColor: "#00FFFF",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 15,
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    marginBottom: 12,
+    alignSelf: "center",
+  },
 
-bottomUpper: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  flexWrap: "nowrap",
-},
-infoSection: {
-  flex: 1,         // take equal share of the row
-  minWidth: 0,     // allow flex-shrink to work
-  paddingHorizontal: 5,
-},
-label: {
-  fontSize: 14,
-  color: "#ccc",
-},
-value: {
-  fontSize: 16,
-  fontWeight: "bold",
-  color: "#fff",
-  flexShrink: 1,   // allow text to shrink
-},
-iconButton: {
-  backgroundColor: "#fff",
-  padding: 10,
-  borderRadius: 50,
-  alignItems: "center",
-  justifyContent: "center",
-},
-bottom:{
-  gap:10
-}
-
+  bottomUpper: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "nowrap",
+  },
+  infoSection: {
+    flex: 1, // take equal share of the row
+    minWidth: 0, // allow flex-shrink to work
+    paddingHorizontal: 5,
+  },
+  label: {
+    fontSize: 14,
+    color: "#ccc",
+  },
+  value: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fff",
+    flexShrink: 1, 
+  },
+  iconButton: {
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bottom: {
+    gap: 10,
+  },
+  card3:{
+ bottom:30
+  }
 });
-
-

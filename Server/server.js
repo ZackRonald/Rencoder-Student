@@ -352,7 +352,8 @@ app.post('/updateProfile',verifyToken, upload.single('profileImage'), async (req
         const studOccupation = req.body.studOccupation;
         const studDesignation = req.body.studDesignation;         
         const imagePath = req.file ? `uploads/${req.file.filename}` : null;
-
+      console.log(studDesignation);
+      
         console.log('Received data:', req.body);
         console.log('Received file:', req.file);
 
@@ -370,7 +371,7 @@ app.post('/updateProfile',verifyToken, upload.single('profileImage'), async (req
         if (studDOB) updateFields.studDOB = studDOB;
         if (imagePath) updateFields.studPic = imagePath;
         if( studOccupation) updateFields.studOccupation = studOccupation;
-        if( studDesignation) updateFields.studDesignation = studDesignation;
+        if( studDesignation || studDesignation==="") updateFields.studDesignation = studDesignation;
 
         const result = await stud.updateOne(
             { studEmail },
@@ -713,6 +714,42 @@ console.log("Completed Courses:", completedCourses);
   }
 });
 
+
+app.post("/time", verifyToken, async (req, res) => {
+  console.log("Incoming Headers:", req.headers);
+  console.log("Incoming Body:", req.body);
+  try {
+    await client.connect();
+console.log("Entered Time Api");
+
+    const { email } = req.body;
+    console.log("Incoming email:", email);
+
+    const response = await stud.findOne({ studEmail: email });
+
+   
+
+    const Timers = [];
+
+    response.courses.forEach(course => {
+      course.subjects.forEach(subject => {
+        console.log(`Subject: ${subject.subject}, Time: ${subject.time}`);
+        Timers.push({ subject: subject.subject, time: subject.time }); 
+      });
+    });
+    
+    console.log("The Timers array", Timers);
+    
+    
+
+    res.status(200).json({ message: "Subject times logged in console", Timers });
+  } catch (error) {
+    console.error("Server Error:", error);
+    res.status(500).json({ message: "Something went wrong", error: error.message });
+  } finally {
+    await client.close();
+  }
+});
 
 
 
