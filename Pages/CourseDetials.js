@@ -28,7 +28,7 @@ export default function CourseDetails({ navigation }) {
       if (!token || !email) return;
 
       const response = await axios.get(
-        "http://192.168.4.52:5000/filterSubjects",
+        "http://192.168.31.150:5000/filterSubjects",
         {
           params: {
             studEmail: email,

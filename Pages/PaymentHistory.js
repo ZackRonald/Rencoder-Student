@@ -36,7 +36,7 @@ const PaymentHistory = () => {
       const token = await SecureStore.getItemAsync("authToken");
 
       const response = await axios.get(
-        `http://192.168.4.52:5000/history`,
+        `http://192.168.31.150:5000/history`,
         {
           params: { studEmail },
           headers: {

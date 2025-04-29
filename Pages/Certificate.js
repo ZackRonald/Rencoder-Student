@@ -9,6 +9,7 @@ import Toast from 'react-native-toast-message';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import CustomModal from "../Pages/CustomModal";  // Corrected import
+import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
 
@@ -33,13 +34,17 @@ export default function Certificate({ navigation }) {
       const token = await SecureStore.getItemAsync("authToken");
       const email = await SecureStore.getItemAsync("userEmail");
 
-      const response = await fetch(`http://192.168.4.52:5000/certificate?studEmail=${email}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+      const response = await axios.post('http://192.168.31.150:5000/certificate', 
+        {
+          studEmail: email, 
         },
-      });
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       const data = await response.json();
       if (data.completedCourses) {

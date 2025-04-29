@@ -162,7 +162,7 @@ export default function HomeScreen({ navigation }) {
       }
 
       const response = await axios.post(
-        "http://192.168.4.52:5000/getAttendance",
+        "http://192.168.31.150:5000/getAttendance",
         { studEmail: email },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -271,7 +271,7 @@ export default function HomeScreen({ navigation }) {
         return [];
       }
 
-      const response = await axios.get("http://192.168.4.52:5000/getCourse", {
+      const response = await axios.get("http://192.168.31.150:5000/getCourse", {
         params: { studEmail: email },
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -326,7 +326,7 @@ export default function HomeScreen({ navigation }) {
       };
 
       const response = await axios.post(
-        "http://192.168.4.52:5000/attendance",
+        "http://192.168.31.150:5000/attendance",
         payload,
         {
           headers: {
@@ -373,7 +373,7 @@ export default function HomeScreen({ navigation }) {
       const email = await SecureStore.getItemAsync("userEmail");
 
       const response = await axios.post(
-        "http://192.168.4.52:5000/time",
+        "http://192.168.31.150:5000/time",
         { email },
         {
           headers: { Authorization: `Bearer ${token}` },
