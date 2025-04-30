@@ -28,7 +28,7 @@ export default function CourseDetails({ navigation }) {
       if (!token || !email) return;
 
       const response = await axios.get(
-        "http://192.168.31.150:5000/filterSubjects",
+        "http://192.168.4.63:5000/filterSubjects",
         {
           params: {
             studEmail: email,
@@ -44,7 +44,10 @@ export default function CourseDetails({ navigation }) {
         setSubjects([]);
       }
     } catch (error) {
-      console.error("Error fetching subjects:", error.response?.data || error.message);
+      console.error(
+        "Error fetching subjects:",
+        error.response?.data || error.message
+      );
       setSubjects([]);
     } finally {
       setLoading(false);
@@ -61,7 +64,9 @@ export default function CourseDetails({ navigation }) {
   return (
     <View style={styles.container}>
       <Modal transparent={true} visible={loading} animationType="fade">
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
           <Loader />
         </View>
       </Modal>
@@ -70,8 +75,10 @@ export default function CourseDetails({ navigation }) {
         <Text style={styles.head}>Course Details</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}  // Hides vertical scrollbar
-  showsHorizontalScrollIndicator={false} >
+      <ScrollView
+        showsVerticalScrollIndicator={false} // Hides vertical scrollbar
+        showsHorizontalScrollIndicator={false}
+      >
         <Picker
           selectedValue={filter}
           style={styles.picker}
@@ -85,25 +92,35 @@ export default function CourseDetails({ navigation }) {
 
         {subjects.length > 0 ? (
           subjects.map((subject, index) => (
-            <View key={index} style={styles.subjectCard}>
-              <Text style={styles.subHead}>{subject.stack}</Text>
-              <View style={styles.cardContent}>
-                <View style={styles.cardColumn}>
-                  <Text style={styles.label}>Trainer:</Text>
-                  <Text style={styles.value}>{subject.trainerName || "N/A"}</Text>
+            <View key={index} style={styles.courseCard}>
+              {/* Top row */}
+              <View style={styles.topRow}>
+                <Text style={styles.stackText2}>{subject.stack}</Text>
+                <Text style={styles.statusText}>{subject.status}</Text>
+              </View>
 
-                  <Text style={styles.label}>Course ID:</Text>
-                  <Text style={styles.value}>{subject.courseID}</Text>
+              {/* Subject */}
+              <Text style={styles.subjectText2}>{subject.subject}</Text>
 
-                  <Text style={styles.label}>Start Date:</Text>
-                  <Text style={styles.value}>{subject.startDate}</Text>
+              <View style={styles.bottom}>
+                <View style={styles.infoRow}>
+                  <View style={styles.infoItem}>
+                    <Text style={styles.label}>Trainer</Text>
+                    <Text style={styles.value}>{subject.trainerName}</Text>
+                  </View>
+                  <View style={styles.infoItem}>
+                    <Text style={styles.label}>Course ID</Text>
+                    <Text style={styles.value}>{subject.courseID}</Text>
+                  </View>
+                  <View style={styles.infoItem}>
+                    <Text style={styles.label}>Batch ID</Text>
+                    <Text style={styles.value}>{subject.batchCode}</Text>
+                  </View>
                 </View>
-                <View style={styles.cardColumn}>
-                  <Text style={styles.label}>Status:</Text>
-                  <Text style={styles.value}>{subject.status}</Text>
 
-                  <Text style={styles.label}>Subject:</Text>
-                  <Text style={styles.value}>{subject.subject}</Text>
+                <View style={styles.dateRow}>
+                  <Text style={styles.label}>Date</Text>
+                  <Text style={styles.value}>{subject.startDate}</Text>
                 </View>
               </View>
             </View>
@@ -136,24 +153,12 @@ const styles = StyleSheet.create({
   picker: {
     width: width * 0.45,
     marginVertical: height * 0.02,
-    backgroundColor: "#D8BFD8",
-    color: "#4B0082",
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    color: "#FFFFFF", // white text color to maintain contrast
     borderRadius: 10,
     alignSelf: "flex-end",
-  },
-  subjectCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
-    padding: width * 0.05,
-    borderRadius: 20,
-    marginBottom: height * 0.025,
-    width: width * 0.95,
-    alignSelf: "center",
-    borderColor: "#FFD700",
     borderWidth: 1,
-    shadowColor: "#fff",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    borderColor: "rgba(255, 255, 255, 0.12)", // matching border with courseCard
   },
   subHead: {
     fontSize: width * 0.06,
@@ -170,17 +175,7 @@ const styles = StyleSheet.create({
   cardColumn: {
     flex: 1,
   },
-  label: {
-    fontSize: width * 0.04,
-    color: "#EDE7F6",
-    fontWeight: "700",
-    marginBottom: 2,
-  },
-  value: {
-    fontSize: width * 0.042,
-    color: "#fff",
-    marginBottom: height * 0.01,
-  },
+
   loadingText: {
     fontSize: 18,
     color: "#FFFFFF",
@@ -192,5 +187,86 @@ const styles = StyleSheet.create({
     color: "#FFD700",
     textAlign: "center",
     marginTop: 20,
+  },
+  courseCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    borderRadius: 20,
+    width: width * 0.9,
+    padding: 18,
+    marginVertical: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderWidth: 1.5,
+  },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  stackText: {
+    fontSize: width * 0.06,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+  stackText2: {
+    fontSize: width * 0.06,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginLeft: 20,
+  },
+
+  statusText: {
+    fontSize: width * 0.045,
+    color: "#00FFB3",
+    fontWeight: "600",
+  },
+  subjectText: {
+    marginTop: 5,
+    fontSize: width * 0.048,
+    color: "#A0A0A0",
+    fontWeight: "500",
+  },
+  subjectText2: {
+    marginTop: 5,
+    fontSize: width * 0.048,
+    color: "black",
+    fontWeight: "500",
+    marginLeft: 20,
+},
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 15,
+  },
+
+  infoItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  label: {
+    fontSize: width * 0.04,
+    color: "#ccc",
+    fontWeight: "700",
+  },
+
+  value: {
+    fontSize: width * 0.045,
+    color: "#FFFFFF",
+    marginTop: 3,
+    fontWeight: "500",
+  },
+  bottom: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dateRow: {
+    marginTop: 15,
+    alignItems: "flex-start",
   },
 });

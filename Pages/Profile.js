@@ -76,7 +76,7 @@ function Profile() {
       
       if (
         tempImage &&
-        tempImage.uri !== "http://192.168.31.150:5000/uploads/profile.png"
+        tempImage.uri !== "http://192.168.4.63:5000/uploads/profile.png"
       ) {
         setProfileImage(tempImage); // Set the selected image
         const fileExtension = tempImage.uri.split(".").pop();
@@ -91,7 +91,7 @@ function Profile() {
      
   
       const response = await axios.post(
-        "http://192.168.31.150:5000/updateProfile",
+        "http://192.168.4.63:5000/updateProfile",
         formData,
         {
           headers: {
@@ -146,7 +146,7 @@ function Profile() {
         return;
       }
   
-      const response = await axios.get("http://192.168.31.150:5000/getProfile",{
+      const response = await axios.get("http://192.168.4.63:5000/getProfile",{
         params: { studEmail: email },
         headers: {
           Authorization: `Bearer ${token}`,
@@ -185,8 +185,8 @@ function Profile() {
   
         setProfileImage({
           uri: studPic
-            ? `http://192.168.31.150:5000/${studPic}`
-            : `http://192.168.31.150:5000/uploads/profile.png`,
+            ? `http://192.168.4.63:5000/${studPic}`
+            : `http://192.168.4.63:5000/uploads/profile.png`,
         });
   
         const isAllDataPresent =
@@ -322,7 +322,7 @@ function Profile() {
 
       <Modal visible={isModalVisible} transparent={true} animationType="slide">
         <View style={styles.modalContainer}>
-        {profileImage?.uri === "http://192.168.31.150:5000/uploads/profile.png" && (
+        {profileImage?.uri === "http://192.168.4.63:5000/uploads/profile.png" && (
   <TouchableOpacity onPress={selectImage} style={styles.imageContainer}>
   <Image
     source={tempImage ? tempImage : profileImage}

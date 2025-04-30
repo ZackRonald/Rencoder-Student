@@ -34,7 +34,7 @@ export default function Certificate({ navigation }) {
       const token = await SecureStore.getItemAsync("authToken");
       const email = await SecureStore.getItemAsync("userEmail");
 
-      const response = await axios.post('http://192.168.31.150:5000/certificate', 
+      const response = await axios.post('http://192.168.4.63:5000/certificate', 
         {
           studEmail: email, 
         },

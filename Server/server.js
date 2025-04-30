@@ -125,7 +125,6 @@ app.post("/attendance", verifyToken, async (req, res) => {
     }
     console.log("Received data:", req.body);
 
-    // Ensure image folder exists
     const folderPath = path.join(__dirname, "attendance_images");
     if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath);
 
@@ -516,13 +515,10 @@ app.post('/verifyOtp', async (req, res) => {
             return res.status(401).json({ message: 'Invalid OTP' });
         }
 
-        // Generate JWT token
         const token = jwt.sign({ userId: user._id, email: user.studEmail }, JWT_SECRET, { expiresIn: '7d' });
 
-        // OTP verified - clear OTP from the database
         await stud.updateOne({ studEmail: email }, { $unset: { otp: "", otpSecret: "", otpExpires: "" } });
 
-        // Send the response only once
         return res.status(200).json({ message: 'OTP verified successfully', token });
     } catch (err) {
         console.error(err);
@@ -716,8 +712,7 @@ console.log("Completed Courses:", completedCourses);
 
 
 app.post("/time", verifyToken, async (req, res) => {
-  console.log("Incoming Headers:", req.headers);
-  console.log("Incoming Body:", req.body);
+  
   try {
     await client.connect();
 console.log("Entered Time Api");

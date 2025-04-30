@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, Modal, TouchableOpacity, Dimensions } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Modal, TouchableOpacity, Dimensions ,Image} from "react-native";
 import axios from "axios";
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -36,7 +36,7 @@ const PaymentHistory = () => {
       const token = await SecureStore.getItemAsync("authToken");
 
       const response = await axios.get(
-        `http://192.168.31.150:5000/history`,
+        `http://192.168.4.63:5000/history`,
         {
           params: { studEmail },
           headers: {
@@ -80,8 +80,13 @@ const PaymentHistory = () => {
       </View>
 
       {courses.filter(course => course.paymentHistory.length > 0).length === 0 ? (
-        <Text style={styles.noData}>No payment history available.</Text>
-      ) : (
+        <View style={styles.noDataContainer}>
+          <Image 
+           source={require("../assets/Images/NoPayment.png")}
+          style={styles.noDataImage} resizeMode="contain" />
+          <Text style={styles.noData}>No payment history available.</Text>
+        </View>
+      )  : (
         courses
           .filter(course => course.paymentHistory.length > 0)
           .map((course, index) => (
@@ -362,8 +367,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily:"Quicksand-SemiBold"
   },
- 
-
+  noDataImage: {
+    width: width * 0.7,
+    height: height * 0.5,
+    marginBottom: 20,
+  },
+  noData: {
+    fontSize: width * 0.06,
+    fontWeight: 'bold',
+    textAlign: "center",
+    color: "white",
+  },
+  noTransactions: {
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  noDataContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: height * 0.1,
+  },
+  
 });
 
 export default PaymentHistory;

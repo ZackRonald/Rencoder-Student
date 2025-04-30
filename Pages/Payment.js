@@ -62,7 +62,7 @@ function Payment() {
       }
   
       const response = await axios.get(
-        "http://192.168.31.150:5000/courseDetails",
+        "http://192.168.4.63:5000/courseDetails",
         {
           params: { studEmail },
           headers: {
@@ -131,7 +131,7 @@ function Payment() {
       }
   
       const response = await axios.post(
-        "http://192.168.31.150:5000/payment",
+        "http://192.168.4.63:5000/payment",
         {
           studEmail,
           stack: selectedCourse.stack,
@@ -237,6 +237,7 @@ function Payment() {
         <View style={styles.noPaymentContainer}>
           <Text style={styles.noPaymentText}>All fees are paid!</Text>
           <Image
+          
             source={require("../assets/Images/paid.png")}
             style={styles.paidImage}
           />
